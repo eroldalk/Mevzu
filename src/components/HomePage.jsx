@@ -1,4 +1,4 @@
-import { Globe, Smartphone, Shuffle, Images, LogOut, Sun, Moon } from "lucide-react";
+import { Globe, Smartphone, Shuffle, Video, Images, LogOut, Sun, Moon } from "lucide-react";
 import { TEMALAR } from "../utils/tema";
 import { useIsDesktop } from "../utils/hooks";
 
@@ -12,9 +12,10 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
   const goruntu   = isim ? `${isim} ${soyisim}`.trim() : kullanici;
 
   const CARDS = [
-    { k: "square", IC: Globe,      t: "Kare Kart",  d: "Twitter · Instagram Post",  b: "1:1 · 1080×1080"  },
-    { k: "reels",  IC: Smartphone, t: "Reels Kart", d: "Instagram Reels · TikTok",  b: "9:16 · 1080×1920" },
-    { k: "surpriz", IC: Shuffle,   t: "Sürpriz Kart", d: "Otomatik Rastgele Söz",   b: "1:1 · Anında"     },
+    { k: "remotion", IC: Video,      t: "Remotion HD Reels", d: "Dinamik Altyazı · 60 FPS", b: "9:16 · Canlı Stüdyo" },
+    { k: "reels",    IC: Smartphone, t: "Reels Kart",        d: "Instagram Reels · TikTok",  b: "9:16 · 1080×1920"   },
+    { k: "square",   IC: Globe,      t: "Kare Kart",         d: "Twitter · Instagram Post",  b: "1:1 · 1080×1080"    },
+    { k: "surpriz",  IC: Shuffle,    t: "Sürpriz Kart",      d: "Otomatik Rastgele Söz",    b: "1:1 · Anında"       },
   ];
 
   /* ── Desktop ─────────────────────────────────────────────────── */

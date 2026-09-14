@@ -6,15 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "remotion:preview": "remotion preview src/remotion/index.js",
+    "remotion:render": "remotion render src/remotion/index.js MevzuReels output/test_reel.mp4"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.524",
+    "@remotion/player": "^4.0.524",
+    "@remotion/renderer": "^4.0.524",
     "csv-parse": "^7.0.1",
     "firebase": "^12.17.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.395.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.524"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
