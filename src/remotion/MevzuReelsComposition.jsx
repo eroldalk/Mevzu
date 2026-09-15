@@ -158,8 +158,31 @@ export const MevzuReelsComposition = ({
         </div>
 
         <AnimatedSubtitles
-          text={quote}
-          fontSize={quote.length > 110 ? 46 : quote.length > 60 ? 52 : 58}
+          text={(quote || "").replace(/\r?\n+/g, " ")}
+          fontSize={(() => {
+            const cleanText = (quote || "").replace(/\r?\n+/g, " ").trim();
+            const len = cleanText.length;
+            const words = cleanText.split(/\s+/).filter(Boolean).length;
+            const isSerif = fontFamily && (fontFamily.includes("Cinzel") || fontFamily.includes("Playfair"));
+
+            let size = 44;
+            if (len > 120 || words > 18) {
+              size = 32;
+            } else if (len > 85 || words > 13) {
+              size = 36;
+            } else if (len > 55 || words > 8) {
+              size = 40;
+            } else if (len > 30 || words > 5) {
+              size = 44;
+            } else {
+              size = 46;
+            }
+
+            if (isSerif) {
+              size = Math.round(size * 0.92);
+            }
+            return size;
+          })()}
           fontFamily={fontFamily}
           highlightColor={highlightColor || themeAccent}
           animStyle={animStyle}

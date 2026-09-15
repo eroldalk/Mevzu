@@ -13,11 +13,15 @@ export const RemotionRoot = () => {
         width={1080}
         height={1920}
         defaultProps={{
-          quote: "Gerçek asla yüzeyde bulunmaz. O, derinlere inmenin bir sonucudur.",
-          author: "Marcus Aurelius",
-          category: "STOACILIK & ZİHİN",
-          primaryColor: "#c9a84c",
-          highlightColor: "#f5c542",
+          quote: "Deniz sakin olduğunda, herkes dümenci kesilir. Asıl mesele fırtınada rotayı kaybetmemektir.",
+          author: "Publilius Syrus",
+          category: "DİRENÇ & ZİHİN",
+          primaryColor: "#38bdf8",
+          highlightColor: "#38bdf8",
+          bgStyle: "ocean",
+          musicUrl: "https://assets.mixkit.co/music/443/443.mp3",
+          animStyle: "highlight",
+          fontFamily: "'DM Sans', sans-serif",
         }}
       />
     </>

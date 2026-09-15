@@ -82,3 +82,56 @@ flowchart TD
 
 ### 4. GitHub Actions Zamanlayıcı (Cron İş Akışı)
 * `.github/workflows/reels-publisher.yml`: Günde 3 kez (sabah, ikindi, akşam) uyanıp jitter ile scripti çalıştıran bulut görevi.
+
+
+
+  "quoteId": "quote_doc_id",
+  "quote": "Bir şeyin doğru olduğunu düşünmek, onu doğru yapmaz.",
+  "author": "Immanuel Kant",
+  "category": "FELSEFE",
+  "musicId": "mixkit_587",
+  "musicUrl": "https://assets.mixkit.co/music/587/587.mp3",
+  "musicSource": "mixkit",
+  "bgId": "statue",
+  "fileName": "reel_20260915_2322_ORNJ.mp4",
+  "renderedAt": "2026-09-15T20:23:29.093Z",
+  "published": false,
+  "instagramId": null
+}
+```
+* Instagram'a yayınlandığında `published: true` ve `instagramId` alanları güncellenerek çift paylaşım riski sıfırlanır.
+---
+## 🎨 65 Adet Sinematik Dikey Arka Plan & Akıllı Çeşitlilik Motoru (`CinematicBackground.jsx`)
+Kullanıcılara her videoda görsel zenginlik sunmak ve "hep aynı deniz/orman geliyor" tekdüzeliğini tamamen kırmak için arka plan havuzu 15'ten **65'e** çıkarılmıştır:
+### 1. Kategori Dağılımı (1080×1920 Dikey Format)
+* **🌊 Doğa & Su (15+ Parça):** Turkuaz okyanuslar, fırtınalı koyu sular, sisli çam ormanları, tropik kumsallar, dağ gölleri, çağlayan nehirler, şelaleler ve yağmur damlaları.
+* **🏔️ Element & Doğa (15+ Parça):** Gece kamp ateşleri, volkanik lavlar, altın gün batımı & dağ sıraları, karlı zirveler, çöl kum tepeleri, fırtına & şimşekler.
+* **🏛️ Felsefe & Kültür (10+ Parça):** Antik Roma/Yunan mermer heykelleri, tapınaklar, devasa klasik kütüphaneler, tarihi el yazması ve taş kemerler.
+* **🌌 Kozmik & Uzay (12+ Parça):** Yıldızlararası galaksiler, derin nebulalar, kuzey ışıkları (aurora), dolunay, süpernovalar ve derin uzay boşluğu.
+* **🏙️ Şehir & Siber Gece (10+ Parça):** Yağmurlu neon metropoller, gece otoyol akışları, fütüristik kuleler ve siberpunk sokaklar.
+* **🖤 Minimalist (1 Parça):** Mat siyah zemin üzerine saf lüks altın parçacık aurası.
+### 2. Akıllı Tekrarsız Seçim Motoru (`lastBgRef`)
+* Bir önceki render'da veya tıklamada gelen arka plan görseli hafızada tutulur (`lastBgRef`).
+* **"✨ Sihirli Uyumlu Oluştur"** butonuna basıldığında bir önceki görsel otomatik olarak havuzdan elenir; **arka arkaya asla aynı görsel seçilmez**.
+### 3. Otomatik Zıt Kontrast & Okunabilirlik Sistemi
+* Her görsel için özel `contrastAccent` ve `overlay` renkleri atanmıştır:
+  * Örneğin turkuaz/mavi denizde yazı otomatik olarak **Kraliyet Altın Sarısı (`#f5c542`)** parlar.
+  * Turuncu gün batımında veya ateşte yazı **Buz Mavisi (`#38bdf8`)** yanar.
+  * Siyah/karanlık temalarda **Neon Sarı (`#facc15`)** ile %100 okunurluk garantilenir.
+* Arka plandaki Ken Burns kamera hareketi ve partikül efektleri 65 görselin tümünde akıcı olarak çalışır.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
