@@ -120,6 +120,36 @@ Kullanıcılara her videoda görsel zenginlik sunmak ve "hep aynı deniz/orman g
   * Siyah/karanlık temalarda **Neon Sarı (`#facc15`)** ile %100 okunurluk garantilenir.
 * Arka plandaki Ken Burns kamera hareketi ve partikül efektleri 65 görselin tümünde akıcı olarak çalışır.
 
+---
+
+## 🔴 KIRMIZI ÇİZGİ: Dinamik Süre Hesabı (Kelime Sayısına Göre Video Süresi)
+
+> ⚠️ **KRİTİK ALGORİTMA KURALI:**
+> Videolar asla sabit 8 saniyeye (240 kare) hapsedilemez! Metin uzunluğuna bakılmaksızın aynı sürenin kullanılması, uzun sözlerde okuma hızını aşırı hızlandırarak izleyicinin videoyu terk etmesine (retention düşüşü) yol açar.
+
+### 📐 Hesaplama Formülü:
+* **Ortalama İnsan Okuma Hızı:** `1 Saniye = 2.8 Kelime`
+* **Okuma Süresi (Saniye):** `Kelime Sayısı / 2.8`
+* **Bekleme & Sindirme Payı (Buffer):** Giriş + Çıkış (Düşünme ve Yazar/Logo algılama payı) = `+2.0 Saniye`
+* **Minimum Taban Süre:** `6 Saniye` (Çok kısa 2-3 kelimelik sözler için minimum süre sınırı)
+* **Maksimum Tavan Süre:** `16 Saniye` (Aşırı uzun sözlerin Reels izlenme oranını düşürmemesi için tavan sınırı)
+
+```javascript
+// Remotion ve render motorunda uygulanacak formül:
+const wordCount = (quoteText || "").trim().split(/\s+/).length;
+const calculatedSeconds = Math.min(16, Math.max(6, (wordCount / 2.8) + 2.0));
+const durationInFrames = Math.round(calculatedSeconds * 30); // 30 FPS
+```
+
+### 📌 Örnek Karşılaştırma Tablosu:
+| Söz Tipi | Kelime Sayısı | Eski Sabit Süre | Yeni Dinamik Süre | Kare Sayısı (30 FPS) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Kısa Söz** (Örn: *"Zaman paradır."*) | 2 - 5 kelime | 8 sn *(Gereksiz uzun)* | **6.0 sn** | 180 Kare |
+| **Orta Söz** (Standart 1-2 cümle) | 12 - 18 kelime | 8 sn *(İdeal)* | **7.5 - 8.5 sn** | 225 - 255 Kare |
+| **Uzun Söz** (Felsefi / 3 cümle) | 25 - 30 kelime | 8 sn *(Çok hızlı akar!)* | **11.0 - 12.5 sn** | 330 - 375 Kare |
+| **Manifesto / Motivasyon** | 38 - 45 kelime | 8 sn *(Okunamaz, çöp olur)* | **14.5 - 16.0 sn** | 435 - 480 Kare |
+
+
 
 
 
