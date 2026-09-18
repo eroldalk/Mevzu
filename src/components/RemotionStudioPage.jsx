@@ -3,9 +3,12 @@ import { Player } from "@remotion/player";
 import { MevzuReelsComposition } from "../remotion/MevzuReelsComposition";
 import { NATURE_PRESETS } from "../remotion/CinematicBackground";
 import { TEMALAR } from "../utils/tema";
-import { getRandomQuote } from "../utils/quotes";
+import { getRandomQuote, markQuoteUsed } from "../utils/quotes";
 import { generateVideoId } from "../utils/pixabayMusic";
 import { getMixkitByCategory, VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibrary";
+import { generateInstagramCaption } from "../utils/captionGenerator";
+import { db } from "../utils/firebase";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
 import {
   ArrowLeft,
   Sparkles,
@@ -22,6 +25,10 @@ import {
   Play,
   Pause,
   Loader2,
+  Send,
+  FileText,
+  Copy,
+  CheckCircle,
 } from "lucide-react";
 
 export const MUSIC_PRESETS = [
@@ -96,6 +103,12 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   const [videoId, setVideoId] = useState(getInitialVideoId);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [kopyalandi, setKopyalandi] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [captionLoading, setCaptionLoading] = useState(false);
+  const [captionCopied, setCaptionCopied] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishedSuccess, setPublishedSuccess] = useState(false);
+  const [currentQuoteObj, setCurrentQuoteObj] = useState(null);
   const fileInputRef = useRef(null);
   const lastMusicUrlRef = useRef("");
   const lastQuoteRef = useRef("");
@@ -116,6 +129,23 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
     }
   };
 
+  // Instagram açıklamasını (soru, yazar, çağrı ve hashtagler) üreten fonksiyon
+  const yenidenCaptionUret = async (qText = quote, qAuthor = author, qCat = category) => {
+    try {
+      setCaptionLoading(true);
+      const cap = await generateInstagramCaption({
+        quote: qText,
+        author: qAuthor,
+        category: qCat,
+      });
+      setCaption(cap);
+    } catch (err) {
+      console.warn("Açıklama üretme uyarısı:", err);
+    } finally {
+      setCaptionLoading(false);
+    }
+  };
+
   // Kullanıcının kendi MP3 dosyasını yüklemesi
   const handleCustomAudioUpload = (e) => {
     const file = e.target.files?.[0];
@@ -133,9 +163,14 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
       setYukleniyor(true);
       const q = await getRandomQuote();
       if (q && q.quote) {
-        setQuote((q.quote || "").replace(/\r?\n+/g, " ").trim());
-        if (q.author) setAuthor(q.author);
-        if (q.cat) setCategory(q.cat.toUpperCase());
+        const text = (q.quote || "").replace(/\r?\n+/g, " ").trim();
+        const aut = q.author || "Mevzu";
+        const cat = (q.cat || "FELSEFE").toUpperCase();
+        setQuote(text);
+        if (q.author) setAuthor(aut);
+        if (q.cat) setCategory(cat);
+        setCurrentQuoteObj(q);
+        yenidenCaptionUret(text, aut, cat);
       }
     } catch (err) {
       console.error("Söz çekilemedi:", err);
@@ -193,7 +228,9 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
         setQuote(quoteText);
         setAuthor(quoteAuthor);
         setCategory(quoteCat);
+        setCurrentQuoteObj(q);
       }
+      yenidenCaptionUret(quoteText, quoteAuthor, quoteCat);
 
       // 2. TÜM 99 TEMA ARASINDAN SEÇİM (Son 20 temayı eleyerek tam döngü sağlar)
       const tumTemaKeyleri = Object.keys(NATURE_PRESETS); // 99 Tema!
@@ -312,6 +349,68 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   }, []);
 
   const cleanName = videoFileName.trim() || `mevzu_${Date.now()}`;
+
+  // Manuel Yayınla / Instagram Hazırla İşlemi
+  const handleManuelYayinla = async () => {
+    try {
+      setPublishing(true);
+
+      // 1. Sözü kullanıldı olarak damgala ve geçmişe ekle
+      if (currentQuoteObj) {
+        markQuoteUsed(currentQuoteObj);
+        if (currentQuoteObj.id && !currentQuoteObj.id.startsWith("local-")) {
+          try {
+            await updateDoc(doc(db, "quotes", currentQuoteObj.id), {
+              used: true,
+              usedAt: new Date().toISOString(),
+            });
+          } catch (e) {
+            console.warn("Firestore söz güncelleme uyarısı:", e);
+          }
+        }
+      }
+
+      // 2. Firestore'a video kaydı oluştur
+      const videoKaydi = {
+        videoId: cleanName,
+        quoteId: currentQuoteObj?.id || null,
+        quote,
+        author,
+        category,
+        caption,
+        bgStyle,
+        musicUrl,
+        musicId,
+        musicName,
+        fontFamily,
+        animStyle,
+        highlightColor,
+        createdAt: new Date().toISOString(),
+        status: "ready_to_publish",
+        manualPublish: true,
+      };
+
+      try {
+        await setDoc(doc(db, "videos", cleanName), videoKaydi);
+      } catch (err) {
+        console.warn("Firestore video kaydı uyarısı:", err);
+      }
+
+      // 3. Açıklamayı panoya kopyala
+      if (caption) {
+        await navigator.clipboard.writeText(caption);
+        setCaptionCopied(true);
+        setTimeout(() => setCaptionCopied(false), 3000);
+      }
+
+      setPublishedSuccess(true);
+      setTimeout(() => setPublishedSuccess(false), 8000);
+    } catch (err) {
+      console.error("Manuel yayınlama hatası:", err);
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const inputStyle = {
     width: "100%",
@@ -464,6 +563,157 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
               autoPlay
               loop
             />
+          </div>
+
+          {/* 📱 Instagram Yayına Hazırla & Manuel Yayınla Kartı */}
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 370,
+              padding: 16,
+              borderRadius: 16,
+              background: "linear-gradient(180deg, rgba(244, 114, 182, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)",
+              border: "1.5px solid rgba(244, 114, 182, 0.35)",
+              boxShadow: "0 12px 30px rgba(0, 0, 0, 0.4)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              boxSizing: "border-box",
+            }}
+          >
+            {/* Kart Başlığı */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#f472b6", display: "flex", alignItems: "center", gap: 7 }}>
+                <FileText size={16} /> Instagram Açıklaması & Hashtag
+              </span>
+              <button
+                onClick={() => yenidenCaptionUret()}
+                disabled={captionLoading}
+                title="Yeni bir soru ve hashtag seti üretir"
+                style={{
+                  background: "rgba(244, 114, 182, 0.15)",
+                  border: "1px solid rgba(244, 114, 182, 0.4)",
+                  color: "#f472b6",
+                  borderRadius: 7,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Sparkles size={12} className={captionLoading ? "spin" : ""} />
+                {captionLoading ? "Üretiliyor..." : "Yenile"}
+              </button>
+            </div>
+
+            {/* Düzenlenebilir Açıklama Metni */}
+            <div style={{ position: "relative" }}>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={6}
+                placeholder="Instagram açıklaması hazırlanıyor..."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  background: "#0a0b0e",
+                  border: "1px solid rgba(244, 114, 182, 0.25)",
+                  borderRadius: 10,
+                  color: "#f3f4f6",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Butonlar: Kopyala ve Manuel Yayınla */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(caption);
+                  setCaptionCopied(true);
+                  setTimeout(() => setCaptionCopied(false), 2000);
+                }}
+                disabled={!caption}
+                style={{
+                  flex: 1,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  background: captionCopied ? "#10b981" : "rgba(255, 255, 255, 0.06)",
+                  border: `1px solid ${captionCopied ? "#10b981" : "rgba(255, 255, 255, 0.15)"}`,
+                  color: "#ffffff",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                }}
+              >
+                {captionCopied ? <Check size={14} /> : <Copy size={14} />}
+                {captionCopied ? "Kopyalandı!" : "Açıklamayı Al"}
+              </button>
+
+              <button
+                onClick={handleManuelYayinla}
+                disabled={publishing}
+                style={{
+                  flex: 1.2,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  border: "none",
+                  color: "#ffffff",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
+                }}
+              >
+                {publishing ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+                {publishing ? "Kaydediliyor..." : "🚀 Manuel Yayınla"}
+              </button>
+            </div>
+
+            {/* Başarı Bildirimi */}
+            {publishedSuccess && (
+              <div
+                style={{
+                  padding: "9px 11px",
+                  borderRadius: 9,
+                  background: "rgba(16, 185, 129, 0.16)",
+                  border: "1px solid #10b981",
+                  color: "#6ee7b7",
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 7,
+                }}
+              >
+                <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <strong>Harika! Video yayına hazırlandı.</strong>
+                  <div style={{ color: "#d1fae5", marginTop: 2 }}>
+                    • Söz Firestore'da tüketildi (tekrar çıkmaz).
+                    <br />• Açıklama ve etiketler panoya kopyalandı!
+                    <br />• Video veritabanına kaydedildi.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Hızlı İndirme & Render Kartı */}
