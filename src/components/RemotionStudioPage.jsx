@@ -107,6 +107,9 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   const [captionLoading, setCaptionLoading] = useState(false);
   const [captionCopied, setCaptionCopied] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishStep, setPublishStep] = useState("");
+  const [publishError, setPublishError] = useState("");
+  const [publishedPostId, setPublishedPostId] = useState("");
   const [publishedSuccess, setPublishedSuccess] = useState(false);
   const [currentQuoteObj, setCurrentQuoteObj] = useState(null);
   const fileInputRef = useRef(null);
@@ -202,7 +205,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   ];
 
   // ✨ TEK TIKLA BÜTÜN ÖZELLİKLERİ BİRBİRİYLE UYUMLU ŞEKİLDE OLUŞTURAN SİHİRLİ MOTOR
-  // 99 TEMA × 170 MÜZİK × 7 FONT × 7 AKIŞ STİLİ = 824,670 EŞSİZ KOMBİNASYON!
+  // 50 DOĞRULANMIŞ TEMA × 170 MÜZİK × 7 FONT × 7 AKIŞ STİLİ = 416,500 EŞSİZ KOMBİNASYON!
   const sihirliUyumluOlustur = async () => {
     try {
       setYukleniyor(true);

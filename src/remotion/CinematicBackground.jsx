@@ -51,7 +51,7 @@ export const NATURE_PRESETS = {
     "id": "campfire",
     "name": "🔥 Gece Kamp Ateşi",
     "cat": "Element & Doğa",
-    "url": "https://images.unsplash.com/photo-1508873696983-2df5293cb325?auto=format&fit=crop&w=1080&q=80",
+    "url": "https://images.unsplash.com/photo-1510312305653-8ed496efae75?auto=format&fit=crop&w=1080&q=80",
     "accent": "#fb923c",
     "contrastAccent": "#38bdf8",
     "overlay": "rgba(24, 12, 6, 0.54)"
@@ -96,7 +96,7 @@ export const NATURE_PRESETS = {
     "id": "library",
     "name": "📚 Kadim Kütüphane",
     "cat": "Felsefe & Kültür",
-    "url": "https://images.unsplash.com/photo-1507842229450-7740e53696c5?auto=format&fit=crop&w=1080&q=80",
+    "url": "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1080&q=80",
     "accent": "#d97706",
     "contrastAccent": "#fbbf24",
     "overlay": "rgba(20, 12, 6, 0.58)"
@@ -155,8 +155,6 @@ export const NATURE_PRESETS = {
     "contrastAccent": "#f5c542",
     "overlay": "rgba(0, 0, 0, 0.85)"
   },
-
-
   "felsefe_colosseum": {
     "id": "felsefe_colosseum",
     "name": "🏛️ Antik Roma Kolezyumu",
