@@ -189,11 +189,11 @@ export const MevzuReelsComposition = ({
         />
       </div>
 
-      {/* 4. ALT BÖLÜM: Yazar & Kategori Rozeti (Safe-Zone: 440px) */}
+      {/* 4. ALT BÖLÜM: Yazar & Kategori Rozeti (Safe-Zone: 480px - Instagram 1:1 Izgara Uyumlu) */}
       <div
         style={{
           position: "absolute",
-          bottom: 440,
+          bottom: 480,
           left: 0,
           width: "100%",
           display: "flex",

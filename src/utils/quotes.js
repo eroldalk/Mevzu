@@ -15,11 +15,19 @@ async function loadPool() {
   if (!poolPromise) {
     poolPromise = (async () => {
       try {
-        const snap = await getDocs(collection(db, "quotes"));
-        if (!snap.empty) {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("firestore_timeout")), 1000)
+        );
+        const snap = await Promise.race([
+          getDocs(collection(db, "quotes")),
+          timeoutPromise,
+        ]);
+        if (snap && !snap.empty) {
           return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         }
-      } catch { /* Firestore'a ulaşılamadı, yerel bankaya düş */ }
+      } catch {
+        /* Firestore'a ulaşılamadı veya zaman aşımı, anında yerel bankaya düş */
+      }
       return QUOTE_BANK.map((q, i) => ({ id: `local-${i}`, ...q }));
     })();
   }

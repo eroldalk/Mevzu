@@ -10,8 +10,9 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, query, where, getDocs, doc, updateDoc, setDoc, limit } from "firebase/firestore";
 import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition } from "@remotion/renderer";
+import { renderMedia, selectComposition, renderStill } from "@remotion/renderer";
 import { generateInstagramCaption } from "./generateCaption.mjs";
+import { uploadAndPublishReel } from "./test_publish_reel.mjs";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -177,90 +178,30 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
   });
 
   console.log(`🎉 Video render tamamlandı: ${outputLocation}`);
-  return { outputLocation, fileName, bgId: bgConfig.bgStyle };
+
+  // 2.5. Saniyeden (Kare 75) Tam Metinli Instagram Kapak Fotoğrafı Üret
+  const coverFileName = `${videoId}_cover.jpg`;
+  const coverLocation = path.join(outputDir, coverFileName);
+
+  console.log(`📸 Instagram kapak fotoğrafı oluşturuluyor (Kare 75 - Tüm Metin Görünür): ${coverFileName}`);
+  try {
+    await renderStill({
+      composition,
+      serveUrl: bundleLocation,
+      output: coverLocation,
+      inputProps: renderProps,
+      frame: 75,
+      imageFormat: "jpeg",
+    });
+    console.log(`🎉 Kapak fotoğrafı hazır: ${coverLocation}`);
+  } catch (stillErr) {
+    console.warn("⚠️ Kapak görseli üretilirken uyarı:", stillErr.message);
+  }
+
+  return { outputLocation, fileName, coverLocation, coverFileName, bgId: bgConfig.bgStyle };
 }
 
-// 3. Instagram Graph API ile Reels Yayınlama
-async function publishToInstagramReels({ videoPublicUrl, caption }) {
-  const instagramAccountId = process.env.INSTAGRAM_ACCOUNT_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
 
-  if (!instagramAccountId || !accessToken) {
-    console.log("ℹ️  [BİLGİ] INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN tanımlı değil.");
-    console.log("    Video ve açıklama yerel 'output/' klasörüne kaydedildi.");
-    console.log("    Token tanımlandığında Instagram'a doğrudan otomatik yüklenecektir.");
-    return false;
-  }
-
-  console.log("🚀 Instagram Graph API ile Reels yükleme başlatılıyor...");
-
-  // Adım A: Media Container Oluştur
-  const containerRes = await fetch(
-    `https://graph.facebook.com/v20.0/${instagramAccountId}/media`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        media_type: "REELS",
-        video_url: videoPublicUrl,
-        caption,
-        access_token: accessToken,
-      }),
-    }
-  );
-
-  const containerData = await containerRes.json();
-  if (!containerRes.ok || !containerData.id) {
-    throw new Error(`Media Container oluşturulamadı: ${JSON.stringify(containerData)}`);
-  }
-
-  const creationId = containerData.id;
-  console.log(`📦 Media container oluşturuldu: ID [${creationId}]. İşlenmesi bekleniyor...`);
-
-  // Adım B: Video işlenme durumunu bekle
-  let isReady = false;
-  for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 6000));
-    const statusRes = await fetch(
-      `https://graph.facebook.com/v20.0/${creationId}?fields=status_code&access_token=${accessToken}`
-    );
-    const statusData = await statusRes.json();
-    console.log(`⏳ Video durumu: ${statusData.status_code || "BEKLENİYOR"}`);
-
-    if (statusData.status_code === "FINISHED") {
-      isReady = true;
-      break;
-    } else if (statusData.status_code === "ERROR") {
-      throw new Error(`Instagram video işleme hatası: ${JSON.stringify(statusData)}`);
-    }
-  }
-
-  if (!isReady) {
-    throw new Error("Video işleme zaman aşımına uğradı.");
-  }
-
-  // Adım C: Reels'ı Canlıya Al (Publish)
-  console.log("🌟 Video hazır! Reels yayına alınıyor...");
-  const publishRes = await fetch(
-    `https://graph.facebook.com/v20.0/${instagramAccountId}/media_publish`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        creation_id: creationId,
-        access_token: accessToken,
-      }),
-    }
-  );
-
-  const publishData = await publishRes.json();
-  if (!publishRes.ok || !publishData.id) {
-    throw new Error(`Yayınlama başarısız: ${JSON.stringify(publishData)}`);
-  }
-
-  console.log(`🔥 TEBRİKLER! Reels Instagram'da canlı yayında! Gönderi ID: ${publishData.id}`);
-  return publishData.id;
-}
 
 // --- ANA ÇALIŞTIRMA FONKSİYONU ---
 async function main() {
@@ -294,7 +235,7 @@ async function main() {
   console.log("------------------------------------\n");
 
   // 5. Videoyu renderla
-  const { outputLocation, fileName, bgId } = await renderReelsVideo({
+  const { outputLocation, fileName, bgId, coverFileName } = await renderReelsVideo({
     quote: quoteData.quote,
     author: quoteData.author,
     category: quoteData.cat,
@@ -307,18 +248,19 @@ async function main() {
   try {
     await setDoc(doc(db, "videos", videoId), {
       videoId,
-      quoteId:     quoteData.id || null,
-      quote:       quoteData.quote,
-      author:      quoteData.author,
-      category:    quoteData.cat,
-      musicId:     musicData.musicId,
-      musicUrl:    musicData.musicUrl,
-      musicSource: musicData.source || "mixkit",
+      quoteId:       quoteData.id || null,
+      quote:         quoteData.quote,
+      author:        quoteData.author,
+      category:      quoteData.cat,
+      musicId:       musicData.musicId,
+      musicUrl:      musicData.musicUrl,
+      musicSource:   musicData.source || "mixkit",
       bgId,
       fileName,
-      renderedAt:  new Date().toISOString(),
-      instagramId: null,   // Yayınlanınca güncellenir
-      published:   false,
+      coverFileName: coverFileName || null,
+      renderedAt:    new Date().toISOString(),
+      instagramId:   null,   // Yayınlanınca güncellenir
+      published:     false,
     });
     console.log(`💾 Firestore video kaydı oluşturuldu: videos/${videoId}`);
   } catch (err) {
@@ -326,10 +268,23 @@ async function main() {
   }
 
   // 7. Instagram'a gönder (Token varsa)
-  const instagramPostId = await publishToInstagramReels({
-    videoPublicUrl: process.env.VIDEO_PUBLIC_URL || null,
-    caption,
-  });
+  let instagramPostId = null;
+  const hasToken = process.env.INSTAGRAM_ACCOUNT_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
+  if (hasToken) {
+    try {
+      console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
+      instagramPostId = await uploadAndPublishReel({
+        videoFilePath: outputLocation,
+        caption,
+        thumbOffset: 2500,
+      });
+    } catch (uploadErr) {
+      console.error("❌ Instagram Reels yükleme hatası:", uploadErr.message);
+    }
+  } else {
+    console.log("ℹ️  [BİLGİ] INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN tanımlı değil.");
+    console.log("    Video yerel 'output/' klasörüne kaydedildi.");
+  }
 
   // Instagram ID'si varsa Firestore kaydını güncelle
   if (instagramPostId) {

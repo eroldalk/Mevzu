@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
-import { renderMedia, selectComposition } from "@remotion/renderer";
+import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 import { uploadAndPublishReel } from "./test_publish_reel.mjs";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, updateDoc, setDoc } from "firebase/firestore";
@@ -97,12 +97,31 @@ export async function manualRenderAndPublish(params, onProgress = () => {}) {
   });
 
   console.log(`[Manuel Yayın] Render bitti: ${outputLocation}`);
+
+  // 📸 2.5. Saniyeden (Kare 75) Tam Metinli Instagram Kapak Fotoğrafı Üret
+  const coverFileName = `${videoId}_cover.jpg`;
+  const coverLocation = path.join(outputDir, coverFileName);
+  try {
+    await renderStill({
+      composition,
+      serveUrl: bundleLocation,
+      output: coverLocation,
+      inputProps: renderProps,
+      frame: 75,
+      imageFormat: "jpeg",
+    });
+    console.log(`[Manuel Yayın] Kapak görseli oluşturuldu: ${coverLocation}`);
+  } catch (stillErr) {
+    console.warn("[Manuel Yayın] Kapak üretme uyarısı:", stillErr.message);
+  }
+
   onProgress({ step: "uploading", message: "🚀 Instagram Meta sunucularına yükleniyor..." });
 
-  // Instagram Graph API ile Resumable Reels yükle
+  // Instagram Graph API ile Resumable Reels yükle (thumb_offset: 2500 ile kapak zorunlu tam yazılı kare olur!)
   const instagramPostId = await uploadAndPublishReel({
     videoFilePath: outputLocation,
     caption: caption || `${quote} — ${author}\n\n#mevzu`,
+    thumbOffset: 2500,
   });
 
   onProgress({ step: "updating_db", message: "💾 Veritabanı ve arşiv güncelleniyor..." });
@@ -117,6 +136,8 @@ export async function manualRenderAndPublish(params, onProgress = () => {}) {
       category,
       bgStyle,
       musicUrl,
+      fileName,
+      coverFileName,
       caption,
       renderedAt: new Date().toISOString(),
       instagramId: instagramPostId,

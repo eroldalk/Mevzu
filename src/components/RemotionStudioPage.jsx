@@ -9,6 +9,7 @@ import { getMixkitByCategory, VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibr
 import { generateInstagramCaption } from "../utils/captionGenerator";
 import { db } from "../utils/firebase";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { downloadInstagramCover } from "../utils/coverExporter";
 import {
   ArrowLeft,
   Sparkles,
@@ -29,6 +30,8 @@ import {
   FileText,
   Copy,
   CheckCircle,
+  Camera,
+  Grid,
 } from "lucide-react";
 
 export const MUSIC_PRESETS = [
@@ -112,6 +115,31 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   const [publishedPostId, setPublishedPostId] = useState("");
   const [publishedSuccess, setPublishedSuccess] = useState(false);
   const [currentQuoteObj, setCurrentQuoteObj] = useState(null);
+  const [showGridGuide, setShowGridGuide] = useState(false);
+  const [coverDownloading, setCoverDownloading] = useState(false);
+
+  // 📸 Instagram Kapak Fotoğrafı İndirme Fonksiyonu (1:1 veya 9:16)
+  const handleCoverDownload = async (aspectRatio = "1:1") => {
+    try {
+      setCoverDownloading(true);
+      const presetObj = NATURE_PRESETS[bgStyle] || NATURE_PRESETS.ocean;
+      await downloadInstagramCover({
+        quote,
+        author,
+        category,
+        bgUrl: customBgUrl.trim() || presetObj.url,
+        primaryColor: presetObj.accent || highlightColor,
+        highlightColor,
+        fontFamily,
+        fileName: videoId || "instagram_reels",
+        aspectRatio,
+      });
+    } catch (err) {
+      console.error("Kapak indirme hatası:", err);
+    } finally {
+      setCoverDownloading(false);
+    }
+  };
   const fileInputRef = useRef(null);
   const lastMusicUrlRef = useRef("");
   const lastQuoteRef = useRef("");
@@ -353,12 +381,40 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
 
   const cleanName = videoFileName.trim() || `mevzu_${Date.now()}`;
 
-  // Manuel Yayınla / Instagram Hazırla İşlemi
+  // Manuel Yayınla: Gerçek Instagram Reels Yayını
   const handleManuelYayinla = async () => {
     try {
       setPublishing(true);
+      setPublishError("");
+      setPublishedSuccess(false);
+      setPublishedPostId("");
+      setPublishStep("🎬 Video 1080×1920 MP4 olarak renderlanıyor...");
 
-      // 1. Sözü kullanıldı olarak damgala ve geçmişe ekle
+      // 1. Backend /api/manual-publish endpoint'ine gönder
+      const res = await fetch("/api/manual-publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quote,
+          author,
+          category,
+          bgStyle,
+          musicUrl,
+          primaryColor: highlightColor,
+          highlightColor,
+          animStyle,
+          fontFamily,
+          caption,
+          quoteId: currentQuoteObj?.id || null,
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Yayınlama başarısız oldu.");
+      }
+
+      // 2. Sözü yerel ve Firestore'da tüketildi olarak damgala
       if (currentQuoteObj) {
         markQuoteUsed(currentQuoteObj);
         if (currentQuoteObj.id && !currentQuoteObj.id.startsWith("local-")) {
@@ -373,43 +429,21 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
         }
       }
 
-      // 2. Firestore'a video kaydı oluştur
-      const videoKaydi = {
-        videoId: cleanName,
-        quoteId: currentQuoteObj?.id || null,
-        quote,
-        author,
-        category,
-        caption,
-        bgStyle,
-        musicUrl,
-        musicId,
-        musicName,
-        fontFamily,
-        animStyle,
-        highlightColor,
-        createdAt: new Date().toISOString(),
-        status: "ready_to_publish",
-        manualPublish: true,
-      };
-
-      try {
-        await setDoc(doc(db, "videos", cleanName), videoKaydi);
-      } catch (err) {
-        console.warn("Firestore video kaydı uyarısı:", err);
-      }
-
       // 3. Açıklamayı panoya kopyala
       if (caption) {
-        await navigator.clipboard.writeText(caption);
-        setCaptionCopied(true);
-        setTimeout(() => setCaptionCopied(false), 3000);
+        try {
+          await navigator.clipboard.writeText(caption);
+          setCaptionCopied(true);
+          setTimeout(() => setCaptionCopied(false), 4000);
+        } catch (e) {}
       }
 
+      setPublishedPostId(result.instagramId);
       setPublishedSuccess(true);
-      setTimeout(() => setPublishedSuccess(false), 8000);
+      setPublishStep("🎉 Instagram'da Canlı Yayında!");
     } catch (err) {
       console.error("Manuel yayınlama hatası:", err);
+      setPublishError(err.message || "Bilinmeyen bir hata oluştu");
     } finally {
       setPublishing(false);
     }
@@ -530,6 +564,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
         >
           <div
             style={{
+              position: "relative",
               width: "100%",
               maxWidth: 370,
               aspectRatio: "9/16",
@@ -566,6 +601,193 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
               autoPlay
               loop
             />
+
+            {/* 📱 Instagram 1:1 Profil Izgarası Kılavuzu (Canlı Önizleme) */}
+            {showGridGuide && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  zIndex: 40,
+                }}
+              >
+                {/* Üst Kırpılan Alan (%21.875) */}
+                <div
+                  style={{
+                    height: "21.875%",
+                    background: "rgba(0, 0, 0, 0.62)",
+                    borderBottom: "2px dashed #f5c542",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "center",
+                    paddingTop: 8,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#f5c542",
+                      background: "rgba(0,0,0,0.7)",
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    ✂️ Profilde Kırpılan Üst Alan
+                  </span>
+                </div>
+
+                {/* 1:1 Instagram Profil Izgarasında Görünen Alan (%56.25) */}
+                <div
+                  style={{
+                    height: "56.25%",
+                    position: "relative",
+                    borderLeft: "2px solid #f5c542",
+                    borderRight: "2px solid #f5c542",
+                    boxShadow: "inset 0 0 25px rgba(245, 197, 66, 0.25)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    paddingBottom: 8,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: "#000000",
+                      background: "#f5c542",
+                      padding: "3px 10px",
+                      borderRadius: 12,
+                      boxShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Grid size={13} /> Instagram Profil Izgarası (1:1 Kare)
+                  </span>
+                </div>
+
+                {/* Alt Kırpılan Alan (%21.875) */}
+                <div
+                  style={{
+                    height: "21.875%",
+                    background: "rgba(0, 0, 0, 0.62)",
+                    borderTop: "2px dashed #f5c542",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    justifyContent: "center",
+                    paddingBottom: 8,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#f5c542",
+                      background: "rgba(0,0,0,0.7)",
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    ✂️ Profilde Kırpılan Alt Alan
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 📸 Instagram Kapak & Izgara Kılavuz Araç Çubuğu */}
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 370,
+              display: "flex",
+              gap: 8,
+            }}
+          >
+            {/* 1:1 Izgara Kılavuzu Aç/Kapat Butonu */}
+            <button
+              onClick={() => setShowGridGuide(!showGridGuide)}
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                borderRadius: 10,
+                background: showGridGuide ? "rgba(245, 197, 66, 0.22)" : "rgba(255, 255, 255, 0.05)",
+                border: `1.5px solid ${showGridGuide ? "#f5c542" : "rgba(255, 255, 255, 0.12)"}`,
+                color: showGridGuide ? "#f5c542" : "#d1d5db",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                transition: "all 0.2s ease",
+              }}
+              title="Instagram profilindeki 1:1 kare kırpma alanını videonun üzerinde gösterir"
+            >
+              <Grid size={14} />
+              {showGridGuide ? "Kılavuzu Kapat" : "1:1 Izgara Kılavuzu"}
+            </button>
+
+            {/* 1:1 Kare Kapak İndir */}
+            <button
+              onClick={() => handleCoverDownload("1:1")}
+              disabled={coverDownloading}
+              style={{
+                flex: 1.1,
+                padding: "8px 10px",
+                borderRadius: 10,
+                background: "linear-gradient(135deg, rgba(245, 197, 66, 0.18) 0%, rgba(217, 119, 6, 0.25) 100%)",
+                border: "1.5px solid rgba(245, 197, 66, 0.5)",
+                color: "#f5c542",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: coverDownloading ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                transition: "all 0.2s ease",
+              }}
+              title="Instagram profil ızgarasında tam görünecek 1:1 kare kapak fotoğrafını indirir"
+            >
+              {coverDownloading ? <Loader2 size={14} className="spin" /> : <Camera size={14} />}
+              {coverDownloading ? "Hazırlanıyor..." : "1:1 Kapak (.jpg)"}
+            </button>
+
+            {/* 9:16 Dikey Kapak İndir */}
+            <button
+              onClick={() => handleCoverDownload("9:16")}
+              disabled={coverDownloading}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 10,
+                background: "rgba(255, 255, 255, 0.05)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                color: "#9ca3af",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: coverDownloading ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+              }}
+              title="Tam boy 9:16 Reels dikey kapak fotoğrafını indirir"
+            >
+              9:16
+            </button>
           </div>
 
           {/* 📱 Instagram Yayına Hazırla & Manuel Yayınla Kartı */}
@@ -672,49 +894,123 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
                   flex: 1.2,
                   padding: "8px 10px",
                   borderRadius: 8,
-                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  background: publishing
+                    ? "rgba(16, 185, 129, 0.4)"
+                    : "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                   border: "none",
                   color: "#ffffff",
                   fontSize: 11,
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: publishing ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 5,
-                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.35)",
+                  boxShadow: publishing ? "none" : "0 4px 14px rgba(16, 185, 129, 0.35)",
                 }}
               >
                 {publishing ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
-                {publishing ? "Kaydediliyor..." : "🚀 Manuel Yayınla"}
+                {publishing ? (publishStep ? "Yayınlanıyor..." : "İşleniyor...") : "🚀 Manuel Yayınla"}
               </button>
             </div>
+
+            {/* Yayınlama Devam Ediyor Göstergesi */}
+            {publishing && (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 9,
+                  background: "rgba(56, 189, 248, 0.12)",
+                  border: "1px solid rgba(56, 189, 248, 0.35)",
+                  color: "#38bdf8",
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Loader2 size={16} className="spin" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong>{publishStep || "Video hazırlanıyor..."}</strong>
+                  <div style={{ color: "#bae6fd", fontSize: 10, marginTop: 2 }}>
+                    Remotion render + Meta Graph API Reels yüklemesi yapılıyor (yaklaşık 20-30 sn).
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Hata Bildirimi */}
+            {publishError && (
+              <div
+                style={{
+                  padding: "9px 11px",
+                  borderRadius: 9,
+                  background: "rgba(239, 68, 68, 0.16)",
+                  border: "1px solid #ef4444",
+                  color: "#fca5a5",
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                }}
+              >
+                <strong>❌ Yayınlama Hatası:</strong>
+                <div style={{ color: "#fee2e2", marginTop: 2, wordBreak: "break-word" }}>
+                  {publishError}
+                </div>
+              </div>
+            )}
 
             {/* Başarı Bildirimi */}
             {publishedSuccess && (
               <div
                 style={{
-                  padding: "9px 11px",
-                  borderRadius: 9,
+                  padding: "11px 13px",
+                  borderRadius: 10,
                   background: "rgba(16, 185, 129, 0.16)",
                   border: "1px solid #10b981",
                   color: "#6ee7b7",
                   fontSize: 11,
-                  lineHeight: 1.4,
+                  lineHeight: 1.5,
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: 7,
+                  flexDirection: "column",
+                  gap: 8,
                 }}
               >
-                <CheckCircle size={15} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
-                <div>
-                  <strong>Harika! Video yayına hazırlandı.</strong>
-                  <div style={{ color: "#d1fae5", marginTop: 2 }}>
-                    • Söz Firestore'da tüketildi (tekrar çıkmaz).
-                    <br />• Açıklama ve etiketler panoya kopyalandı!
-                    <br />• Video veritabanına kaydedildi.
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <CheckCircle size={16} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <strong style={{ color: "#34d399", fontSize: 12 }}>
+                      🎉 Reels Instagram'da Canlı Yayında!
+                    </strong>
+                    <div style={{ color: "#d1fae5", marginTop: 2 }}>
+                      • Hesap: <strong>@mevzusozler</strong>
+                      <br />• Gönderi ID: {publishedPostId || "Yayınlandı"}
+                      <br />• Açıklama panonuza da kopyalandı.
+                    </div>
                   </div>
                 </div>
+
+                <a
+                  href="https://www.instagram.com/mevzusozler/"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "7px 12px",
+                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                    color: "#ffffff",
+                    borderRadius: 7,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    fontSize: 11,
+                    textAlign: "center",
+                  }}
+                >
+                  Instagram'da Gör ↗
+                </a>
               </div>
             )}
           </div>

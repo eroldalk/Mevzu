@@ -66,3 +66,39 @@ durationInFrames = Math.round(Hedef Süre * 30 FPS)
 | **Uzun Söz** (Felsefi / 3 cümle) | 25 - 30 kelime | 8 sn *(Çok hızlı akar!)* | **11.0 - 12.5 sn** | 330 - 375 Kare |
 | **Manifesto / Motivasyon** | 38 - 45 kelime | 8 sn *(Okunamaz, çöp olur)* | **14.5 - 16.0 sn** | 435 - 480 Kare |
 
+---
+
+## 🖼️ Pexels CDN & Kalıcı Arka Plan Havuzu Mimarisi
+
+> 📌 **NEDEN PEXELS CDN?**
+> Pixabay API'si süreli/imzalı (`pixabay.com/get/...`) geçici URL'ler verir; bu linkler birkaç gün içinde ölerek render ve önizlemede siyah ekrana yol açar.
+> **Pexels CDN (`images.pexels.com/photos/...`)** ise kalıcıdır, süresi dolmaz, CORS engeline takılmaz ve yüksek kaliteli 9:16 dikey çekimler sunar.
+
+### 🎯 3 Aşamalı Entegrasyon Planı:
+
+1. **Aşama 1: Kalıcı Doğrulanmış CDN Havuzu (Öncelikli)**
+   - Pexels API üzerinden her kategori için (`Doğa & Su`, `Kozmik & Uzay`, `Felsefe & Kültür`, `Şehir & Gece`, `Element & Doğa`) `orientation=portrait` parametresiyle en kaliteli 100-150 dikey görselin kalıcı CDN URL'leri çekilir.
+   - Çekilen URL'ler `CinematicBackground.jsx` içine kalıcı preset olarak yazılır.
+   - **Faydası:** Sıfır API kotası tüketimi, sıfır ağ gecikmesi, %100 kesintisiz çalışma.
+
+2. **Aşama 2: Canlı Arama / Otomatik Çekim (Opsiyonel)**
+   - Stüdyoda arzu edilirse "Pexels'ten Yeni Çek" butonu ile canlı API üzerinden anlık taze görsel çekilebilir (`api.pexels.com/v1/search?orientation=portrait`).
+
+3. **Aşama 3: Sinematik Dikey Video (MP4 Loop) Desteği**
+   - Pexels Videos API (`/videos/search`) ile hafif boyutlu dikey loop MP4 videolar (yağan yağmur, dalgalanan deniz, gece gökyüzü) getirilerek fotoğraftan hareketli canlı videoya geçiş sağlanabilir.
+
+---
+
+## 📸 Instagram 1:1 Profil Izgarası & Otomatik Kapak Sistemi (TAMAMLANDI ✅)
+
+> 📌 **AMAÇ:** Instagram profil ızgarasında videoların ilk boş kare yüzünden boş/yazısız çıkmasını önlemek ve tüm metnin 1:1 karede kesintisiz görünmesini sağlamak.
+
+1. **Yazar & Rozet Safe-Zone (`bottom: 480px`):**
+   - `MevzuReelsComposition.jsx` içinde alt bölüm 480px güvenli alana çekildi. Böylece 1080x1920 dikey video Instagram profilinde 1:1 kare (1080x1080) kırpıldığında hem söz hem yazar %100 görünür.
+2. **Otomatik `renderStill` Kapak Üretimi:**
+   - `renderAndPublish.mjs` otomasyonu, video renderından hemen sonra 2.5. saniyeden (`frame: 75`, tüm metnin parladığı kare) yüksek çözünürlüklü `${videoId}_cover.jpg` üretir.
+3. **Instagram Reels `thumb_offset: 2500`:**
+   - Meta Graph API isteğine `thumb_offset: 2500` eklendi; Instagram Reels otomatik olarak 2.5. saniyedeki tam metinli kareyi kapak seçer.
+4. **Web Stüdyosu Canlı 1:1 Izgara Kılavuzu & Kapak İndirici:**
+   - Stüdyoya canlı `[ 📱 1:1 Izgara Kılavuzu ]` ve `[ 📸 1:1 Kapak (.jpg) ]` / `[ 9:16 ]` butonları eklendi (`coverExporter.js`).
+

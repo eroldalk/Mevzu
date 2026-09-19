@@ -6,27 +6,28 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 
-// .env oku
-const envPath = path.join(rootDir, ".env");
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  envContent.split("\n").forEach((line) => {
-    const [k, ...v] = line.split("=");
-    if (k && v.length) {
-      process.env[k.trim()] = v.join("=").trim();
-    }
-  });
+function getCredentials() {
+  const envPath = path.join(rootDir, ".env");
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    envContent.split("\n").forEach((line) => {
+      const [k, ...v] = line.split("=");
+      if (k && v.length) {
+        process.env[k.trim()] = v.join("=").trim();
+      }
+    });
+  }
+  return {
+    accountId: process.env.INSTAGRAM_ACCOUNT_ID,
+    accessToken: process.env.INSTAGRAM_ACCESS_TOKEN,
+  };
 }
 
-const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-
-if (!accountId || !accessToken) {
-  console.error("❌ Hata: INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN bulunamadı!");
-  process.exit(1);
-}
-
-export async function uploadAndPublishReel({ videoFilePath, caption }) {
+export async function uploadAndPublishReel({ videoFilePath, caption, thumbOffset = 2500 }) {
+  const { accountId, accessToken } = getCredentials();
+  if (!accountId || !accessToken) {
+    throw new Error("INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN bulunamadı!");
+  }
   console.log(`🎬 Video hazırlanıyor: ${videoFilePath}`);
   if (!fs.existsSync(videoFilePath)) {
     throw new Error(`Video dosyası bulunamadı: ${videoFilePath}`);
@@ -45,6 +46,7 @@ export async function uploadAndPublishReel({ videoFilePath, caption }) {
       upload_type: "resumable",
       media_type: "REELS",
       caption: caption || "#mevzu",
+      thumb_offset: thumbOffset, // 2.5 saniye (2500ms) - tüm yazının eksiksiz göründüğü an kapak olur!
       access_token: accessToken,
     }),
   });
