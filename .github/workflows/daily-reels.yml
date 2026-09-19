@@ -5,11 +5,17 @@ on:
   # 06:00 UTC = 09:00 Türkiye Saati (Sabah Gönderisi)
   # 17:00 UTC = 20:00 Türkiye Saati (Akşam Gönderisi)
   schedule:
-    # --- TEST ZAMANLAMALARI (Bu Gece Test İçin) ---
-    # 20:20 UTC = 23:20 Türkiye Saati (~10 dk sonra)
+    # --- PEŞ PEŞE CANLI TEST ZAMANLAMALARI (Gözlemlemek İçin) ---
+    # 20:20 UTC = 23:20 TR (10 dk sonra)
     - cron: "20 20 * * *"
-    # 20:35 UTC = 23:35 Türkiye Saati (~25 dk sonra)
-    - cron: "35 20 * * *"
+    # 20:25 UTC = 23:25 TR (15 dk sonra)
+    - cron: "25 20 * * *"
+    # 20:30 UTC = 23:30 TR (20 dk sonra)
+    - cron: "30 20 * * *"
+    # 20:40 UTC = 23:40 TR (30 dk sonra)
+    - cron: "40 20 * * *"
+    # 20:50 UTC = 23:50 TR (40 dk sonra)
+    - cron: "50 20 * * *"
 
     # --- GÜNLÜK 4 ANA YAYIN SAATİ (Türkiye Saati: UTC+3) ---
     # 06:00 UTC = 09:00 TR (Sabah)
