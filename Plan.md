@@ -1,104 +1,93 @@
-# Remotion Entegrasyonu ve Otomatik Video Üretim / Yayınlama Sistemi Planı
+# #MEVZU — Otonom Reels & Medya Üretim Sistemi Planı
 
-Bu plan, **Erol-Mevzu** projesine **Remotion** video motorunu entegre etmeyi, yüksek kaliteli (1080×1920) dinamik altyazılı video şablonu oluşturmayı ve n8n gibi araçlara ihtiyaç duymadan belirli saatlerde otomatik video üretip yayınlamaya hazır hale getiren bir otomasyon hattı kurmayı hedefler.
-
----
-
-## 📱 Hedeflenen Video Görsel Tasarımı (Mockup)
-
-Remotion ile kare kare oluşturulacak dikey video şablonunun hedef görsel düzeni:
-
-![Remotion ile Üretilecek 9:16 Reels Video Şablonu Mockup'ı](C:\Users\Lenovo\.gemini\antigravity\brain\d3c6e3fa-ffc1-417c-998d-6c56d103dda6\reels_video_mockup_1789322780308.jpg)
-
-### 🎨 Görsel Tasarım Bileşenleri:
-1. **Üst Marka / Logo Bölümü:** `#MEVZU”` altın sarısı ve minimalist tipografi.
-2. **Merkezi Dinamik Altyazı (Dynamic Highlight Captions):**
-   * Söz ekrana gelirken okunan/vurgulanan kelimeler dinamik olarak altın sarısı renkle yanar (`highlight`), kelime kelime akış sağlanır.
-   * Yüksek çözünürlüklü modern tipografi.
-3. **Alt Yazar & Kategori Rozeti:** Yazar ismi ve kategori rozeti (`GÜNDEM`, `FİNANS`, `ZİHİN` vb.).
-4. **Sinematik Arka Plan:** Derin mat siyah üzerine hafif altın ışıltılı dalga ve parçacık animasyonu (Remotion `interpolate` ve `spring` ile 60 FPS akıcı hareket).
+Bu belge, **Mevzu** projesinin tamamlanan özelliklerini, çalışan otonom mimarisini ve sırasıyla hayata geçirilecek gelecek yol haritasını içerir.
 
 ---
 
-## 📋 Yapılacak Adımlar
+## 🟢 1. BÖLÜM: TAMAMLANANLAR (%100 ÇALIŞIR DURUMDA ✅)
 
-### 1. Remotion Paketlerinin Kurulumu & Yapılandırma
-* `remotion`, `@remotion/player`, `@remotion/cli` ve `@remotion/renderer` bağımlılıklarının eklenmesi.
-* Remotion giriş noktası ve konfigürasyon dosyalarının oluşturulması (`src/remotion/Root.jsx` ve `src/remotion/index.js`).
+### 🎬 1. Sinematik Video Render Motoru (Remotion)
+- [x] **1080×1920 (9:16) Dikey HD Video:** 30 FPS akıcı Reels formatı.
+- [x] **Dinamik Altyazı & Tipografi:** Kelime kelime vurgulanan (`highlight`, `viral_pop`) modern animasyonlar (`AnimatedSubtitles.jsx`).
+- [x] **Safe-Zone Optimizasyonu:** Üst marka logosu (`#MEVZU`) ve alt yazar bölümü, Instagram Reels arayüz butonlarının altında kalmayacak şekilde güvenli alana (`bottom: 480px`) yerleştirildi.
+- [x] **65+ Zengin Arka Plan Teması:** Okyanus, fırtına, sisli orman, kütüphane, antik Roma, heykeller, kozmik uzay vb. saf JS veri tabanına (`naturePresets.js`) taşındı (Linux uyumlu).
+- [x] **170 Doğrulanmış Mixkit Müzik Arşivi:** Kategoriye özel otomatik müzik seçici (`mixkitLibrary.js`).
 
-### 2. Video Şablonu ve Dinamik Altyazı Bileşenleri
-* `Root.jsx`: `MevzuReels` Composition kaydı (1080×1920, 30 FPS).
-* `MevzuReelsComposition.jsx`: Mockup'taki `#MEVZU` logosu, kategori, alıntı ve yazar bileşeni.
-* `AnimatedSubtitles.jsx`: Sözün kelime kelime vurgulanarak (TikTok/Reels tarzı highlight) ekrana gelmesi.
-* `CinematicBackground.jsx`: Sinematik yumuşak gradient ve partikül akışları.
+### ✍️ 2. Yapay Zeka Metin Yazarı (Gemini AI)
+- [x] **4 Parçalı Viral Reels Açıklaması Formülü:**
+  1. Yazar — Eser / Konu
+  2. Yorum getiren düşündürücü soru
+  3. Kaydet & Yorum çağrısı (CTA)
+  4. 6-8 odaklı viral hashtag (sonu `#mevzu` ile biter).
+- [x] Söz metni açıklama kutusunda asla tekrar edilmez (video izlenmesini artırır).
 
-### 3. Web Arayüzü Entegrasyonu
-* `SurprizPage.jsx` veya `ReelsPage.jsx` içerisine `@remotion/player` eklenerek canlı oynatma ve timeline kontrolü sağlanması.
+### 📱 3. Meta & Instagram Resmi Graph API Entegrasyonu
+- [x] **Bağlı Hesaplar:** Instagram Business Account (`@mevzusozler` / ID: `17841410437073383`) ve Facebook Sayfası (`Mevzu` / ID: `1304935579369418`).
+- [x] **Süresiz Belirteç (Never-Expiring Page Token):** Meta App Secret ile 60 günlük token'dan türetilen, süresi **asla dolmayan** resmi sayfa anahtarı alındı ve `.env` ile GitHub Secrets'a işlendi.
+- [x] **Resumable Binary Upload API (`rupload.facebook.com`):** Harici bulut depolama (S3/Firebase Storage) maliyeti olmadan, yerel MP4 dosyasını doğrudan Meta sunucularına parça parça aktaran sıfır masraflı hızlı yükleme motoru kuruldu.
 
-### 4. Otomasyon Scripti & Zamanlayıcı (n8n'siz)
-* `scripts/renderAutomatedVideo.mjs`: Firestore'dan söz çekip doğrudan 1080x1920 MP4 üreten otomasyon scripti.
-* `scripts/scheduler.mjs` & GitHub Actions cron iş akışı: Saate göre tetikleme.
+### 📸 4. 1:1 Profil Izgarası & Kapak Sistemi
+- [x] **Otomatik `thumb_offset: 2500`:** Instagram Reels yüklemesinde videonun tam 2.5. saniyesindeki (tüm sözün, yazarın ve logonun eksiksiz okunduğu) kare otomatik kapak resmi seçilir.
+- [x] **`renderStill` Kapak Çıktısı:** Video renderından hemen sonra 75. kareden yüksek çözünürlüklü `${videoId}_cover.jpg` üretilir.
+- [x] **Stüdyo 1:1 Kılavuzu & JPG İndirici:** Canlı arayüzde 1:1 ızgara çerçevesi ve tek tıkla kapak görseli indirme (`coverExporter.js`).
 
----
+### 🚀 5. Web Stüdyosu Canlı Yayın Butonu
+- [x] `http://localhost:5174/` adresinde söz, müzik ve arka plan canlı önizlenebilir.
+- [x] **"🚀 Manuel Yayınla" Butonu:** Tek tıkla arka planda videoyu renderlar ve 50 saniyede doğrudan `@mevzusozler` hesabında canlıya alır.
 
-## 🔴 KIRMIZI ÇİZGİ: Dinamik Süre Hesabı (Kelime Sayısına Göre Video Süresi)
-
-> ⚠️ **KRİTİK ALGORİTMA KURALI:**
-> Videolar asla sabit 8 saniyeye hapsedilemez! Metin uzunluğuna bakılmaksızın aynı sürenin kullanılması, uzun sözlerde okuma hızını aşırı hızlandırarak izleyicinin videoyu terk etmesine (retention düşüşü) yol açar.
-
-### 📐 Hesaplama Formülü:
-* **Ortalama İnsan Okuma Hızı:** `1 Saniye = 2.8 Kelime`
-* **Okuma Süresi (Saniye):** `Kelime Sayısı / 2.8`
-* **Bekleme & Sindirme Payı (Buffer):** Giriş + Çıkış (Düşünme ve Yazar/Logo algılama payı) = `+2.0 Saniye`
-* **Minimum Taban Süre:** `6 Saniye` (Çok kısa 2-3 kelimelik sözler için minimum süre sınırı)
-* **Maksimum Tavan Süre:** `16 Saniye` (Aşırı uzun sözlerin Reels izlenme oranını düşürmemesi için tavan sınırı)
-
-```text
-Hedef Süre (sn) = Math.min(16, Math.max(6, (Kelime Sayısı / 2.8) + 2.0))
-durationInFrames = Math.round(Hedef Süre * 30 FPS)
-```
-
-### 📌 Örnek Karşılaştırma Tablosu:
-| Söz Tipi | Kelime Sayısı | Eski Sabit Süre | Yeni Dinamik Süre | Kare Sayısı (30 FPS) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Kısa Söz** (Örn: *"Zaman paradır."*) | 2 - 5 kelime | 8 sn *(Gereksiz uzun)* | **6.0 sn** | 180 Kare |
-| **Orta Söz** (Standart 1-2 cümle) | 12 - 18 kelime | 8 sn *(İdeal)* | **7.5 - 8.5 sn** | 225 - 255 Kare |
-| **Uzun Söz** (Felsefi / 3 cümle) | 25 - 30 kelime | 8 sn *(Çok hızlı akar!)* | **11.0 - 12.5 sn** | 330 - 375 Kare |
-| **Manifesto / Motivasyon** | 38 - 45 kelime | 8 sn *(Okunamaz, çöp olur)* | **14.5 - 16.0 sn** | 435 - 480 Kare |
+### ⏰ 6. GitHub Actions Otonom Bulut Yayın Hattı (Günde 6 Yayın)
+- [x] Bilgisayar kapalı olsa bile çalışan otonom Linux sanal sunucusu (`daily-reels.yml`).
+- [x] **Günlük 6 Altın Yayın Takvimi:**
+  - 🌅 **08:30** — Sabah Kahvesi
+  - 🕚 **11:00** — İş Öncesi Motivasyon
+  - 🥪 **13:30** — Öğle Molası
+  - ☕ **16:30** — İkindi Molası
+  - 🌆 **19:30** — Akşam Dönüşü
+  - 🌙 **22:00** — Gece Derin Düşünce
+- [x] `workflow_dispatch` ile istenildiği an tek tıkla anlık test çalıştırma.
+- [x] Üretilen videoları 14 gün boyunca bulutta yedekleme (`Artifacts`).
 
 ---
 
-## 🖼️ Pexels CDN & Kalıcı Arka Plan Havuzu Mimarisi
+## 🟡 2. BÖLÜM: YAPILACAKLAR (GELECEK YOL HARİTASI 📋)
 
-> 📌 **NEDEN PEXELS CDN?**
-> Pixabay API'si süreli/imzalı (`pixabay.com/get/...`) geçici URL'ler verir; bu linkler birkaç gün içinde ölerek render ve önizlemede siyah ekrana yol açar.
-> **Pexels CDN (`images.pexels.com/photos/...`)** ise kalıcıdır, süresi dolmaz, CORS engeline takılmaz ve yüksek kaliteli 9:16 dikey çekimler sunar.
+### 📚 1. Söz Havuzu & "1 Söz 1 Kere Reels Yapılsın" Mimarisi (Öncelikli)
+* **Amaç:** Aynı sözün Instagram'a ikinci kez asla atılmaması, sıfır tekrar ve kusursuz stok yönetimi.
+* **Uygulama:**
+  1. Firestore'daki mevcut 203 sözün `used` durumu taranıp sıfırlanacak.
+  2. Üzerine 200-300 adet yeni felsefe, motivasyon ve strateji sözü (Marcus Aurelius, Nietzsche, Sun Tzu, Seneca, Machiavelli, Schopenhauer, Dostoyevski) depolanacak.
+  3. Bir söz Reels yapıldığı an Firestore'da:
+     - `used: true`
+     - `usedAt: ISO Tarih`
+     - `usedInVideoId: reel_...` olarak mühürlenecek.
+  4. Otomasyon `where("used", "==", false)` ile sadece sıfır kilometredeki sözleri çekecek; kullanılmış hiçbir söze bir daha dokunmayacak.
+  5. **Video Deposu (`videos` koleksiyonu):** Üretilen her videonun reçetesi (söz, yazar, müzik, arka plan, Instagram ID, kapak) kalıcı kütüphaneye kaydedilecek.
 
-### 🎯 3 Aşamalı Entegrasyon Planı:
+### 🌐 2. Çapraz Yayın (Cross-Posting): Facebook & X (Twitter)
+* **Amaç:** Tek bir render ile aynı anda 3 büyük platformda organik kitle toplamak.
+* **Uygulama:**
+  - **Facebook Sayfası Reels:** Aynı video ve açıklama Meta Graph API üzerinden eşzamanlı olarak `Mevzu` Facebook Sayfasına da Reels olarak yüklenecek.
+  - **X (Twitter) Bağlantısı:** X API v2 entegre edilerek, video ve/veya sözün görseli düşündürücü soruyla birlikte tweet olarak fırlatılacak.
 
-1. **Aşama 1: Kalıcı Doğrulanmış CDN Havuzu (Öncelikli)**
-   - Pexels API üzerinden her kategori için (`Doğa & Su`, `Kozmik & Uzay`, `Felsefe & Kültür`, `Şehir & Gece`, `Element & Doğa`) `orientation=portrait` parametresiyle en kaliteli 100-150 dikey görselin kalıcı CDN URL'leri çekilir.
-   - Çekilen URL'ler `CinematicBackground.jsx` içine kalıcı preset olarak yazılır.
-   - **Faydası:** Sıfır API kotası tüketimi, sıfır ağ gecikmesi, %100 kesintisiz çalışma.
+### 📱 3. Hikaye (Story) Paylaşımı
+* **Amaç:** Sadece hikayeleri izleyen takipçileri yakalamak ve profile çekmek.
+* **Uygulama:**
+  - Reels yayına girdikten hemen sonra, söze özel hazırlanan kanca soru ve kapak görseli (`media_type: "STORIES"`) Instagram & Facebook Hikayelerinde paylaşılacak.
+  - Takipçiyi ana akıştaki videoya yönlendiren merak uyandırıcı bir köprü olacak.
 
-2. **Aşama 2: Canlı Arama / Otomatik Çekim (Opsiyonel)**
-   - Stüdyoda arzu edilirse "Pexels'ten Yeni Çek" butonu ile canlı API üzerinden anlık taze görsel çekilebilir (`api.pexels.com/v1/search?orientation=portrait`).
+### 🔴 4. Dinamik Süre Hesabı (Kırmızı Çizgi)
+* **Amaç:** Sabit 8 saniye yerine, sözün uzunluğuna ve okuma hızına göre otomatik video süresi.
+* **Uygulama:**
+  - Formül: `Hedef Süre (sn) = Math.min(16, Math.max(6, (Kelime Sayısı / 2.8) + 2.0))`
+  - Kısa sözler 6 sn, standart sözler 8 sn, felsefi uzun sözler 12-14 sn.
+  - **Motivasyon Konuşması & Uzun Söz Modu:** 30 saniyelik daha uzun ve derin alıntılar için dinamik kare (`durationInFrames`) genişletmesi.
 
-3. **Aşama 3: Sinematik Dikey Video (MP4 Loop) Desteği**
-   - Pexels Videos API (`/videos/search`) ile hafif boyutlu dikey loop MP4 videolar (yağan yağmur, dalgalanan deniz, gece gökyüzü) getirilerek fotoğraftan hareketli canlı videoya geçiş sağlanabilir.
+### 🎨 5. Tasarım & Sinematik Geliştirmeler
+* **Uygulama:**
+  - Yeni dikey hareketli video (loop) ve atmosferik temalar (yağmurlu kütüphane, şömine ateşi, antik mermer harabeler).
+  - Altyazı akış efektlerinde alternatifler (viral pop, daktilo, yumuşak sinematik fade).
 
----
-
-## 📸 Instagram 1:1 Profil Izgarası & Otomatik Kapak Sistemi (TAMAMLANDI ✅)
-
-> 📌 **AMAÇ:** Instagram profil ızgarasında videoların ilk boş kare yüzünden boş/yazısız çıkmasını önlemek ve tüm metnin 1:1 karede kesintisiz görünmesini sağlamak.
-
-1. **Yazar & Rozet Safe-Zone (`bottom: 480px`):**
-   - `MevzuReelsComposition.jsx` içinde alt bölüm 480px güvenli alana çekildi. Böylece 1080x1920 dikey video Instagram profilinde 1:1 kare (1080x1080) kırpıldığında hem söz hem yazar %100 görünür.
-2. **Otomatik `renderStill` Kapak Üretimi:**
-   - `renderAndPublish.mjs` otomasyonu, video renderından hemen sonra 2.5. saniyeden (`frame: 75`, tüm metnin parladığı kare) yüksek çözünürlüklü `${videoId}_cover.jpg` üretir.
-3. **Instagram Reels `thumb_offset: 2500`:**
-   - Meta Graph API isteğine `thumb_offset: 2500` eklendi; Instagram Reels otomatik olarak 2.5. saniyedeki tam metinli kareyi kapak seçer.
-4. **Web Stüdyosu Canlı 1:1 Izgara Kılavuzu & Kapak İndirici:**
-   - Stüdyoya canlı `[ 📱 1:1 Izgara Kılavuzu ]` ve `[ 📸 1:1 Kapak (.jpg) ]` / `[ 9:16 ]` butonları eklendi (`coverExporter.js`).
-
+### 🔍 6. URL (ID) ile Video Bulma & Geri Çağırma
+* **Uygulama:**
+  - Tarayıcıya `localhost:5174/reel_[videoId]` yazıldığında veya sitedeki arama kutusuna ID/yazar/kelime girildiğinde;
+  - Firestore'daki `videos` deposundan o videonun tüm reçetesi çekilecek ve stüdyoda birebir canlı oynatılacak.
