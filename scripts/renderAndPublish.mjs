@@ -101,7 +101,7 @@ async function fetchUnusedQuote() {
 }
 
 // 65 Adet Arka Plan Havuzundan Kategoriye Uygun Zengin ve Tekrarsız Seçici
-import { NATURE_PRESETS } from "../src/remotion/CinematicBackground.jsx";
+import { NATURE_PRESETS } from "../src/remotion/naturePresets.js";
 
 function getBackgroundForCategory(categoryStr = "") {
   const catUpper = (categoryStr || "").toUpperCase();
