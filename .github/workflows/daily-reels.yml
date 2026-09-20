@@ -5,19 +5,19 @@ on:
   # 06:00 UTC = 09:00 Türkiye Saati (Sabah Gönderisi)
   # 17:00 UTC = 20:00 Türkiye Saati (Akşam Gönderisi)
   schedule:
-    # --- GÜNLÜK 6 ALTIN YAYIN SAATİ (Türkiye Saati: UTC+3) ---
-    # 05:30 UTC = 08:30 TR (Sabah Kahvesi)
-    - cron: '30 5 * * *'
-    # 08:00 UTC = 11:00 TR (İş Öncesi Motivasyon)
-    - cron: '0 8 * * *'
-    # 10:30 UTC = 13:30 TR (Öğle Molası)
-    - cron: '30 10 * * *'
-    # 13:30 UTC = 16:30 TR (İkindi Molası)
-    - cron: '30 13 * * *'
-    # 16:30 UTC = 19:30 TR (Akşam Dönüşü)
-    - cron: '30 16 * * *'
-    # 19:00 UTC = 22:00 TR (Gece Derin Düşünce)
-    - cron: '0 19 * * *'
+    # --- GÜNLÜK 6 ALTIN YAYIN SAATİ (Jitter & Akıllı Tolerans Uyumlu - TR: UTC+3) ---
+    # 05:24 UTC = 08:24 TR -> 08:25 - 08:34 arası rastgele (Sabah Kahvesi)
+    - cron: '24 5 * * *'
+    # 07:54 UTC = 10:54 TR -> 10:55 - 11:04 arası rastgele (İş Öncesi Motivasyon)
+    - cron: '54 7 * * *'
+    # 10:24 UTC = 13:24 TR -> 13:25 - 13:34 arası rastgele (Öğle Molası)
+    - cron: '24 10 * * *'
+    # 13:24 UTC = 16:24 TR -> 16:25 - 16:34 arası rastgele (İkindi Molası)
+    - cron: '24 13 * * *'
+    # 16:24 UTC = 19:24 TR -> 19:25 - 19:34 arası rastgele (Akşam Dönüşü)
+    - cron: '24 16 * * *'
+    # 18:54 UTC = 21:54 TR -> 21:55 - 22:04 arası rastgele (Gece Derin Düşünce)
+    - cron: '54 18 * * *'
 
   # GitHub Paneli Üzerinden "Run Workflow" Butonuyla İstenildiği An Manuel Tetikleme
   workflow_dispatch:

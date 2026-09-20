@@ -75,10 +75,11 @@ async function determineActiveSlot() {
   const { dateStr, hour, minute, currentMinutes } = getTurkeyNow();
   console.log(`🕒 Türkiye Saati: ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} (Tarih: ${dateStr})`);
 
-  // Zamanı gelmiş veya geçmiş olan slotları filtrele
+  // Zamanı gelmiş, 7 dakika yaklaşmış veya geçmiş olan slotları filtrele (Erken Tolerans Penceresi)
   const eligibleSlots = DAILY_SLOTS.filter(s => {
     const slotMinutes = s.hour * 60 + s.minute;
-    return currentMinutes >= slotMinutes;
+    // Slota 7 dakika kalmışsa veya saat geçmişse aktif kabul et (Örn: 13:30 için 13:23'ten itibaren geçerli)
+    return currentMinutes >= (slotMinutes - 7);
   });
 
   if (eligibleSlots.length === 0) {
@@ -113,6 +114,48 @@ async function determineActiveSlot() {
 
   console.log("✅ Bu saate kadar planlanan tüm yayınlar zaten başarıyla yapılmış. İşlem gerekmiyor.");
   return null;
+}
+
+// ─── Doğal Algoritma Jitter Motoru (İnsan Taklidi Gecikme) ──────────────────
+async function applyHumanJitter(slot) {
+  if (process.env.FORCE_PUBLISH === "true") {
+    console.log("⚡ [MANUEL MOD]: Jitter atlanıyor, anında yayınlanacak.");
+    return;
+  }
+
+  const { currentMinutes } = getTurkeyNow();
+  const slotMinutes = slot.hour * 60 + slot.minute;
+
+  // Hedef dakika penceresi: Slotun 5 dakika öncesi ile 4 dakika sonrası arası (Örn: 13:25 - 13:34)
+  // [-5, +4] aralığında rastgele bir ofset seç
+  const randomOffset = Math.floor(Math.random() * (4 - (-5) + 1)) + (-5);
+  const targetMinuteOfDay = slotMinutes + randomOffset;
+  
+  // Hedefe kalan dakika farkını hesapla
+  const diffMinutes = targetMinuteOfDay - currentMinutes;
+
+  if (diffMinutes <= 0) {
+    console.log(`⚡ Zaman zaten hedefe ulaştı/geçti (${slot.id} slotu). Jitter beklemesi yapmadan anında başlanıyor.`);
+    return;
+  }
+
+  // Kalan dakikayı saniyeye çevirip ilave rastgele saniyeler ekle (0 - 45 sn)
+  const waitSeconds = Math.min(diffMinutes * 60 + Math.floor(Math.random() * 45), 600);
+  const mins = Math.floor(waitSeconds / 60);
+  const secs = waitSeconds % 60;
+
+  const targetHour = Math.floor(targetMinuteOfDay / 60);
+  const targetMin = targetMinuteOfDay % 60;
+  const targetTimeFormatted = `${String(targetHour).padStart(2, "0")}:${String(targetMin).padStart(2, "0")}`;
+
+  console.log("--------------------------------------------------");
+  console.log(`🎲 [DOĞAL JITTER]: Instagram spam koruması için insan taklidi devrede!`);
+  console.log(`🕒 Hedef Slot: [${slot.id}] | Bugünkü Doğal Yayın Saati: ${targetTimeFormatted}`);
+  console.log(`⏳ Kalan bekleme: ${mins} dakika ${secs} saniye...`);
+  console.log("--------------------------------------------------");
+
+  await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
+  console.log(`🚀 [${targetTimeFormatted}] Geldi! Video üretimi ve canlı yayın başlatılıyor...`);
 }
 
 // ─── 170 Adet Doğrulanmış Mixkit Müzik Seçici ───────────────────────────
@@ -307,6 +350,11 @@ async function main() {
   const currentDateStr = activeSlotInfo ? activeSlotInfo.dateStr : getTurkeyNow().dateStr;
 
   console.log(`🎯 Hedef Slot: [${currentSlotId}] — ${currentSlotName}`);
+
+  // Doğal Algoritma Jitter'ı (Her gün farklı dakikada yayınlanması için rastgele bekleme)
+  if (activeSlotInfo) {
+    await applyHumanJitter(activeSlotInfo.slot);
+  }
 
   // 1. Benzersiz video ID üret
   const videoId = generateVideoId();
