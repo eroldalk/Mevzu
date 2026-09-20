@@ -63,11 +63,22 @@ Bu belge, **Mevzu** projesinin tamamlanan özelliklerini, çalışan otonom mima
   4. Otomasyon `where("used", "==", false)` ile sadece sıfır kilometredeki sözleri çekecek; kullanılmış hiçbir söze bir daha dokunmayacak.
   5. **Video Deposu (`videos` koleksiyonu):** Üretilen her videonun reçetesi (söz, yazar, müzik, arka plan, Instagram ID, kapak) kalıcı kütüphaneye kaydedilecek.
 
-### 🌐 2. Çapraz Yayın (Cross-Posting): Facebook & X (Twitter)
-* **Amaç:** Tek bir render ile aynı anda 3 büyük platformda organik kitle toplamak.
+### 🌐 2. Çapraz Yayın (Cross-Posting): Facebook, X (Twitter) & TikTok
+* **Amaç:** Tek bir render ile aynı anda tüm büyük platformlarda organik kitle toplamak.
 * **Uygulama:**
   - **Facebook Sayfası Reels:** Aynı video ve açıklama Meta Graph API üzerinden eşzamanlı olarak `Mevzu` Facebook Sayfasına da Reels olarak yüklenecek.
   - **X (Twitter) Bağlantısı:** X API v2 entegre edilerek, video ve/veya sözün görseli düşündürücü soruyla birlikte tweet olarak fırlatılacak.
+  - **TikTok:** TikTok Content Posting API entegrasyonu ile video eş zamanlı dikey olarak TikTok'a aktarılacak.
+
+#### 📊 Platform Günlük Paylaşım Limitleri & Güvenlik Analizi (Günde 6 Video Senaryosu)
+| Platform | Günlük Resmi API Sınırı | Spam/Gölge Ban Güvenli Sınırı | Bizim Günlük Hedef (6 Video) | Kota / Güvenlik Durumu |
+| :--- | :--- | :--- | :--- | :--- |
+| **Instagram** | 25 Reels / 24 saat | 8 - 10 Reels / gün | **6 Video** | 🟢 Mükemmel (Sınırın çok altında, organik) |
+| **Facebook Sayfa** | 50+ Reels / 24 saat | 15 - 20 Reels / gün | **6 Video** | 🟢 Çok Rahat (Sıfır risk) |
+| **X (Twitter)**| 50 Gönderi / gün (Aylık 1500) | 30 - 40 Tweet / gün | **6 Video/Tweet** | 🟢 Kotanın sadece %12'si kullanılır |
+| **TikTok** | 10 - 30 Video / gün | 5 - 8 Video / gün | **6 Video** | 🟢 Tam Altın Oran (Algoritma için ideal) |
+
+* **GitHub Actions Süresi:** 1 render (~60 sn) + 4 platforma paralel yükleme (~60 sn) = video başına ~2 dakika. Günde 6 video ayda **~360 dakika** harcar (GitHub'ın 2.000 dakikalık ücretsiz kotasının sadece **%18'i**).
 
 ### 📱 3. Hikaye (Story) Paylaşımı
 * **Amaç:** Sadece hikayeleri izleyen takipçileri yakalamak ve profile çekmek.
