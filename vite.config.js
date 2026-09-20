@@ -37,6 +37,6 @@ export default defineConfig({
       },
     },
   ],
-  base: "/",
+  base: process.env.GITHUB_PAGES ? "/Mevzu/" : "./",
   server: { port: 5174, strictPort: true },
 });

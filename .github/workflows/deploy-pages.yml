@@ -1,0 +1,56 @@
+name: 🌐 Mevzu Stüdyosu Canlı Yayınla (GitHub Pages)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "index.html"
+      - "vite.config.js"
+      - "package.json"
+      - "public/**"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Depoyu Klonla
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js Kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: 📦 Bağımlılıkları Yükle
+        run: npm install
+
+      - name: 🔨 Projeyi Derle (Build)
+        env:
+          GITHUB_PAGES: "true"
+        run: npm run build
+
+      - name: 📤 GitHub Pages Çıktısını Ayarla
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "./dist"
+
+      - name: 🚀 Canlıya Dağıt (Deploy)
+        id: deployment
+        uses: actions/deploy-pages@v4
