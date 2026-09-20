@@ -40,6 +40,81 @@ function generateVideoId() {
   return `reel_${date}_${time}_${rand}`;
 }
 
+// ─── Akıllı Yayın Slotları & Gecikme Takip Motoru ──────────────────────────
+// Günlük 6 Altın Yayın Saati (Türkiye Saati: UTC+3)
+const DAILY_SLOTS = [
+  { id: "08:30", hour: 8,  minute: 30, name: "Sabah Kahvesi" },
+  { id: "11:00", hour: 11, minute: 0,  name: "İş Öncesi Motivasyon" },
+  { id: "13:30", hour: 13, minute: 30, name: "Öğle Molası" },
+  { id: "16:30", hour: 16, minute: 30, name: "İkindi Molası" },
+  { id: "19:30", hour: 19, minute: 30, name: "Akşam Dönüşü" },
+  { id: "22:00", hour: 22, minute: 0,  name: "Gece Derin Düşünce" },
+];
+
+// Türkiye yerel saatini hesapla (UTC+3)
+function getTurkeyNow() {
+  const now = new Date();
+  // UTC milisaniye + 3 saat
+  const trTimestamp = now.getTime() + (3 * 60 * 60 * 1000);
+  const trDate = new Date(trTimestamp);
+  
+  const yyyy = trDate.getUTCFullYear();
+  const mm = String(trDate.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(trDate.getUTCDate()).padStart(2, "0");
+  const dateStr = `${yyyy}-${mm}-${dd}`; // Örn: "2026-09-20"
+
+  const hour = trDate.getUTCHours();
+  const minute = trDate.getUTCMinutes();
+  const currentMinutes = hour * 60 + minute;
+
+  return { dateStr, hour, minute, currentMinutes, trDate };
+}
+
+// Yayınlanması gereken ama gecikmiş/atlanmış ilk slotu bul
+async function determineActiveSlot() {
+  const { dateStr, hour, minute, currentMinutes } = getTurkeyNow();
+  console.log(`🕒 Türkiye Saati: ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} (Tarih: ${dateStr})`);
+
+  // Zamanı gelmiş veya geçmiş olan slotları filtrele
+  const eligibleSlots = DAILY_SLOTS.filter(s => {
+    const slotMinutes = s.hour * 60 + s.minute;
+    return currentMinutes >= slotMinutes;
+  });
+
+  if (eligibleSlots.length === 0) {
+    console.log("ℹ️  Günün ilk yayın saati (08:30) henüz gelmedi. Bekleniyor.");
+    return null;
+  }
+
+  // Firestore'dan bugünün yayınlanmış videolarını çek (videos koleksiyonu)
+  const videosRef = collection(db, "videos");
+  const q = query(videosRef, where("published", "==", true), limit(50));
+  const snap = await getDocs(q);
+  
+  const publishedSlotIds = new Set();
+  snap.forEach(d => {
+    const data = d.data();
+    // Video bugün yayınlandıysa ve bir slotId'si varsa
+    const videoDate = data.date || (data.publishedAt ? data.publishedAt.slice(0, 10) : (data.renderedAt ? data.renderedAt.slice(0, 10) : ""));
+    if (videoDate === dateStr && data.slotId) {
+      publishedSlotIds.add(data.slotId);
+    }
+  });
+
+  console.log(`📊 Bugün 'videos' deposuna kaydedilen slotlar: [${Array.from(publishedSlotIds).join(", ") || "Henüz yok"}]`);
+
+  // Zamanı geçmiş ama henüz yayınlanmamış İLK slotu bul (Eksik/Geciken slot)
+  for (const slot of eligibleSlots) {
+    if (!publishedSlotIds.has(slot.id)) {
+      console.log(`🚨 [YAYIN GEREKİYOR] Zamanı geçmiş/gelmiş eksik slot tespit edildi: ${slot.id} (${slot.name})`);
+      return { slot, dateStr, isCatchUp: true };
+    }
+  }
+
+  console.log("✅ Bu saate kadar planlanan tüm yayınlar zaten başarıyla yapılmış. İşlem gerekmiyor.");
+  return null;
+}
+
 // ─── 170 Adet Doğrulanmış Mixkit Müzik Seçici ───────────────────────────
 import { getMixkitByCategory } from "../src/utils/mixkitLibrary.js";
 
@@ -54,7 +129,7 @@ function getMusicForCategory(categoryStr = "") {
 }
 
 // 1. Firestore'dan kullanılmamış sıradaki sözü çek
-async function fetchUnusedQuote() {
+async function fetchUnusedQuote(slotId = "MANUAL", dateStr = "") {
   console.log("🔍 Firestore'dan kullanılmamış söz aranıyor...");
   const quotesRef = collection(db, "quotes");
   const q = query(quotesRef, where("used", "!=", true), limit(10));
@@ -86,8 +161,10 @@ async function fetchUnusedQuote() {
     await updateDoc(doc(db, "quotes", selectedDoc.id), {
       used: true,
       usedAt: new Date().toISOString(),
+      usedSlot: slotId,
+      usedDate: dateStr,
     });
-    console.log(`✅ Söz damgalandı: ID [${selectedDoc.id}]`);
+    console.log(`✅ Söz damgalandı: ID [${selectedDoc.id}] (Slot: ${slotId}, Tarih: ${dateStr})`);
   } catch (err) {
     console.warn("Söz durumu güncellenirken uyarı:", err.message);
   }
@@ -206,15 +283,37 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
 // --- ANA ÇALIŞTIRMA FONKSİYONU ---
 async function main() {
   console.log("==========================================");
-  console.log("🚀 #MEVZU OTOMASYON MOTORU BAŞLATILDI");
+  console.log("🚀 #MEVZU OTONOM YAYIN MOTORU BAŞLATILDI");
   console.log("==========================================");
+
+  // 0. Akıllı Slot & Gecikme Kontrolü
+  // Eğer FORCE_PUBLISH ortam değişkeni verilmişse kontrolü atlar (manuel test modu)
+  const isForce = process.env.FORCE_PUBLISH === "true";
+  let activeSlotInfo = null;
+
+  if (!isForce) {
+    activeSlotInfo = await determineActiveSlot();
+    if (!activeSlotInfo) {
+      console.log("⏸️  Şu an yayınlanması gereken gecikmiş veya aktif bir slot bulunmuyor.");
+      console.log("✨ Sistem güvenle kapatılıyor. Bir sonraki tetiklemede görüşmek üzere!");
+      return;
+    }
+  } else {
+    console.log("⚡ [MANUEL ZORLAMA MODU]: Slot kontrolü atlanıyor, direkt yayın yapılacak!");
+  }
+
+  const currentSlotId = activeSlotInfo ? activeSlotInfo.slot.id : "MANUAL";
+  const currentSlotName = activeSlotInfo ? activeSlotInfo.slot.name : "Manuel Tetikleme";
+  const currentDateStr = activeSlotInfo ? activeSlotInfo.dateStr : getTurkeyNow().dateStr;
+
+  console.log(`🎯 Hedef Slot: [${currentSlotId}] — ${currentSlotName}`);
 
   // 1. Benzersiz video ID üret
   const videoId = generateVideoId();
   console.log(`🆔 Video ID: ${videoId}`);
 
   // 2. Sözü çek
-  const quoteData = await fetchUnusedQuote();
+  const quoteData = await fetchUnusedQuote(currentSlotId, currentDateStr);
   console.log(`📖 Söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
 
   // 3. Pixabay'den kategoriye uygun müzik seç
@@ -252,6 +351,9 @@ async function main() {
       quote:         quoteData.quote,
       author:        quoteData.author,
       category:      quoteData.cat,
+      slotId:        currentSlotId,
+      slotName:      currentSlotName,
+      date:          currentDateStr,
       musicId:       musicData.musicId,
       musicUrl:      musicData.musicUrl,
       musicSource:   musicData.source || "mixkit",
@@ -286,22 +388,23 @@ async function main() {
     console.log("    Video yerel 'output/' klasörüne kaydedildi.");
   }
 
-  // Instagram ID'si varsa Firestore kaydını güncelle
+  // 8. Yayın başarılıysa Slotu ve Video kaydını mühürle (Çift paylaşımı engelleyen kilit)
   if (instagramPostId) {
     try {
+      // Videos koleksiyonunu güncelle ve kilitle
       await updateDoc(doc(db, "videos", videoId), {
         instagramId: instagramPostId,
         published:   true,
         publishedAt: new Date().toISOString(),
       });
-      console.log(`📸 Firestore güncellendi: instagramId=${instagramPostId}`);
+      console.log(`🔒 [SLOT MÜHÜRLENDİ] videos/${videoId} güncellendi: slotId=${currentSlotId}, instagramId=${instagramPostId}`);
     } catch (err) {
-      console.warn("Instagram ID güncellenemedi:", err.message);
+      console.warn("Slot veya video durumu güncellenirken uyarı:", err.message);
     }
   }
 
   console.log("==========================================");
-  console.log(`✅ TAMAMLANDI → ${videoId}`);
+  console.log(`✅ TAMAMLANDI → Slot: [${currentSlotId}] | Video: ${videoId}`);
   console.log("==========================================");
 }
 
