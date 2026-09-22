@@ -1,6 +1,7 @@
 import { Globe, Smartphone, Shuffle, Video, Images, LogOut, Sun, Moon } from "lucide-react";
 import { TEMALAR } from "../utils/tema";
 import { useIsDesktop } from "../utils/hooks";
+import SozHavuzuBattery from "./SozHavuzuBattery";
 
 export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
   const T = TEMALAR[tema];
@@ -94,14 +95,23 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
         {/* ── Main ── */}
         <div style={{
           flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          padding: "60px 80px", gap: 48,
+          padding: "50px 60px", gap: 36, position: "relative", minHeight: "100vh",
         }}>
+          {/* Üst Navbar / Sağ Köşe: Söz Havuzu Şarjı */}
+          <div style={{
+            position: "absolute", top: 24, right: 36,
+            display: "flex", alignItems: "center", gap: 12
+          }}>
+            <SozHavuzuBattery compact={true} onClick={() => onOpen("postlar")} />
+          </div>
+
           <div style={{ textAlign: "center" }}>
             <h1 style={{ fontSize: 32, fontWeight: 700, color: T.text, margin: 0, letterSpacing: -0.5 }}>Alıntı Kartı Oluştur</h1>
             <p style={{ fontSize: 13, color: T.faint, margin: "10px 0 0", letterSpacing: 1 }}>Format seç ve oluşturmaya başla</p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24, width: "100%", maxWidth: 900 }}>
+          {/* 2'ye 2 Düzenli Kart Izgarası */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 20, width: "100%", maxWidth: 760 }}>
             {CARDS.map((c) => (
               <div
                 key={c.k}
@@ -118,16 +128,16 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
                 }}
                 style={{
                   background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 20,
-                  padding: "40px 32px", cursor: "pointer",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 20,
+                  padding: "30px 28px", cursor: "pointer",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
                   transition: "all .2s", textAlign: "center",
                 }}
               >
-                <div style={{ width: 80, height: 80, borderRadius: 20, background: `rgba(${T.gr},.1)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <c.IC size={36} color={T.gold} />
+                <div style={{ width: 72, height: 72, borderRadius: 18, background: `rgba(${T.gr},.1)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <c.IC size={32} color={T.gold} />
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: T.text }}>{c.t}</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: T.text }}>{c.t}</span>
                   <span style={{ fontSize: 12, color: T.faint }}>{c.d}</span>
                   <span style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", padding: "3px 12px", borderRadius: 20, background: `rgba(${T.gr},.1)`, color: T.gold, width: "fit-content", margin: "4px auto 0" }}>{c.b}</span>
                 </div>
@@ -135,7 +145,7 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
             ))}
           </div>
 
-          <div style={{ fontSize: 10, color: T.faint, textAlign: "center", padding: "12px 20px", border: `1px dashed ${T.border}`, borderRadius: 10, maxWidth: 420, lineHeight: 1.8 }}>
+          <div style={{ fontSize: 10, color: T.faint, textAlign: "center", padding: "10px 18px", border: `1px dashed ${T.border}`, borderRadius: 10, maxWidth: 400, lineHeight: 1.8 }}>
             📲 Telefona yüklemek için tarayıcı menüsünden <strong style={{ color: T.muted }}>"Ana Ekrana Ekle"</strong> seçeneğini kullan
           </div>
         </div>
@@ -154,74 +164,92 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      minHeight: "100vh", gap: 36, padding: "80px 24px 48px",
+      minHeight: "100vh", gap: 28, padding: "80px 20px 40px",
       background: `radial-gradient(ellipse 70% 50% at 50% 10%,rgba(${T.gr},.07) 0%,transparent 65%),${T.bg}`,
       position: "relative",
     }}>
 
-      <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 10 }}>
+      {/* Mobil Sol Üst Navbar: Söz Havuzu Şarjı */}
+      <div style={{ position: "absolute", top: 14, left: 14 }}>
+        <SozHavuzuBattery compact={true} onClick={() => onOpen("postlar")} />
+      </div>
+
+      <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{goruntu}</span>
           {isim && <span style={{ fontSize: 9, color: T.faint, letterSpacing: 1 }}>@{kullanici}</span>}
         </div>
         <div
           onClick={() => onOpen("profil")}
-          style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: `2px solid ${T.gold}`, background: `rgba(${T.gr},.12)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: `2px solid ${T.gold}`, background: `rgba(${T.gr},.12)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
         >
           {foto
             ? <img src={foto} alt="profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <span style={{ fontSize: 18, fontWeight: 700, color: T.gold }}>{kullanici.charAt(0).toUpperCase()}</span>
+            : <span style={{ fontSize: 16, fontWeight: 700, color: T.gold }}>{kullanici.charAt(0).toUpperCase()}</span>
           }
         </div>
         <button onClick={onToggleTema} style={iconBtn}
           onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
           onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
         >
-          {tema === "dark" ? <Sun size={17} color={T.muted} /> : <Moon size={17} color={T.muted} />}
+          {tema === "dark" ? <Sun size={16} color={T.muted} /> : <Moon size={16} color={T.muted} />}
         </button>
         <button onClick={() => onOpen("postlar")} style={iconBtn}
           onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
           onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
         >
-          <Images size={17} color={T.muted} />
+          <Images size={16} color={T.muted} />
         </button>
         <button onClick={onCikis} style={iconBtn}
           onMouseEnter={e => e.currentTarget.style.borderColor = "#e07070"}
           onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
         >
-          <LogOut size={16} color={T.faint} />
+          <LogOut size={15} color={T.faint} />
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 2 }}>
-          <span style={{ fontFamily: "Georgia,serif", fontSize: 40, color: T.gold, lineHeight: 1 }}>'</span>
-          <span style={{ fontSize: 48, fontWeight: 700, color: T.gold, lineHeight: 1 }}>#</span>
+          <span style={{ fontFamily: "Georgia,serif", fontSize: 36, color: T.gold, lineHeight: 1 }}>'</span>
+          <span style={{ fontSize: 42, fontWeight: 700, color: T.gold, lineHeight: 1 }}>#</span>
         </div>
-        <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: 7, color: T.gold }}>MEVZU</span>
-        <span style={{ fontSize: 9, letterSpacing: 4, color: T.faint, textTransform: "uppercase", marginTop: 2 }}>Günün Nabzına Söz</span>
+        <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: 7, color: T.gold }}>MEVZU</span>
+        <span style={{ fontSize: 8, letterSpacing: 4, color: T.faint, textTransform: "uppercase", marginTop: 2 }}>Günün Nabzına Söz</span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 340 }}>
+      {/* 2'ye 2 Düzenli Mobil Kart Izgarası */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, width: "100%", maxWidth: 360 }}>
         {CARDS.map((c) => (
           <div key={c.k} onClick={() => onOpen(c.k)}
-            style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 16, padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 16, transition: "all .2s" }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.transform = "translateY(-1px)"; }}
+            style={{
+              background: T.bg2,
+              border: `1px solid ${T.border}`,
+              borderRadius: 16,
+              padding: "18px 12px",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              gap: 10,
+              transition: "all .2s"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.gold; e.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = "translateY(0)"; }}
           >
-            <div style={{ width: 52, height: 52, borderRadius: 12, background: `rgba(${T.gr},.08)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <c.IC size={24} color={T.gold} />
+            <div style={{ width: 46, height: 46, borderRadius: 12, background: `rgba(${T.gr},.08)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <c.IC size={22} color={T.gold} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{c.t}</span>
-              <span style={{ fontSize: 11, color: T.faint }}>{c.d}</span>
-              <span style={{ fontSize: 8, letterSpacing: 2, textTransform: "uppercase", padding: "2px 8px", borderRadius: 20, background: `rgba(${T.gr},.1)`, color: T.gold, marginTop: 2, width: "fit-content" }}>{c.b}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.text, lineHeight: 1.2 }}>{c.t}</span>
+              <span style={{ fontSize: 10, color: T.faint, lineHeight: 1.2 }}>{c.d}</span>
+              <span style={{ fontSize: 8, letterSpacing: 1.5, textTransform: "uppercase", padding: "2px 6px", borderRadius: 12, background: `rgba(${T.gr},.1)`, color: T.gold, marginTop: 4, width: "fit-content", margin: "4px auto 0" }}>{c.b}</span>
             </div>
           </div>
         ))}
       </div>
 
-      <div style={{ fontSize: 10, color: T.faint, textAlign: "center", padding: "12px 18px", border: `1px dashed ${T.border}`, borderRadius: 10, maxWidth: 320, lineHeight: 1.7 }}>
+      <div style={{ fontSize: 10, color: T.faint, textAlign: "center", padding: "10px 16px", border: `1px dashed ${T.border}`, borderRadius: 10, maxWidth: 320, lineHeight: 1.6 }}>
         📲 Telefona yüklemek için tarayıcı menüsünden<br />
         <strong style={{ color: T.muted }}>"Ana Ekrana Ekle"</strong> seçeneğini kullan
       </div>

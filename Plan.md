@@ -112,11 +112,13 @@ Bu belge, **Mevzu** projesinin tamamlanan özelliklerini, çalışan otonom mima
 1. **Canlı İstatistik Bandı:**
    - Sayfa başında canlı: `{totalQuotes} SÖZ · {usedQuotes} KULLANILDI · {unusedQuotes} HAZIR · {totalVideos} VİDEO`.
 2. **3'lü Modüler Sekme Yapısı:**
-   - **`[ 🎬 Atılan Videolar ]`**: Firestore `videos` koleksiyonu, yayınlandı rozeti, söz & yazar bilgisi, `[ Stüdyoda Aç ]` ve `[ Sil ]` aksiyonları.
-   - **`[ 📚 Söz Havuzu ]`**: Firestore `quotes` koleksiyonu, canlı kelime & yazar araması, kategori filtresi, `[ Kullanılmamış / Kullanılmış ]` filtre hapları, `[ Bu Sözle Reels Yap ]` ve `[ Sil ]` aksiyonları.
-   - **`[ 🖼️ İndirilen Görseller ]`**: Var olan yerel kart indirme arşivi korundu.
-3. **Çift Yönlü İlişki (`quoteId` ↔ `videoId`):**
+   - **`[ 🎬 Atılan Videolar ]`**: Firestore `videos` koleksiyonu tablosu, minyatür kapak görseli sütunu, yayınlandı rozeti, söz & yazar bilgisi, `[ Stüdyoda Aç ]` ve `[ Sil ]` aksiyonları.
+   - **`[ 📚 Söz Havuzu ]`**: 25'li sayfalama, canlı arama, kategori filtresi, `[ Sıradakiler (Hazır) / Kullanılanlar ]` sekmeleri, `[ Reels Yap ]` ve `[ Sil ]` aksiyonları.
+   - **`[ 🖼️ İndirilen Görseller ]`**: Stüdyodan indirilen 1:1 ve 9:16 kapaklar ile alıntı kartları yerel galeride (`mevzu_postlar`) otomatik listelenir.
+3. **Kullanılmış Reels'i Birebir Açma Motoru (0ms Sıfır Gecikme & Kesin Veri):**
+   - Tablodan "Stüdyoda Aç" tıklandığında videonun sözü, yazarı, teması (`bgId`), tema kategorisi (`selectedCat`), vurgu rengi (`highlightColor`) ve Mixkit müzik parçası (`musicUrl`, `musicName`) stüdyoya eksiksiz aktarılır ve birebir açılır.
+4. **Çift Yönlü İlişki (`quoteId` ↔ `videoId`):**
    - Videonun hangi sözden üretildiği, sözün hangi videoda kullanıldığı karşılıklı etiketlerle tıklandığında anında gösterilir.
-4. **Site Üzerinden CRUD (Ekle/Sil/Durum Değiştir):**
+5. **Site Üzerinden CRUD (Ekle/Sil/Durum Değiştir):**
    - Modal penceresi üzerinden tek tıkla yeni söz ekleme (`addDoc`), söz durumunu sıraya geri alma/kullanıldı yapma (`updateDoc`) ve kalıcı silme (`deleteDoc`).
 

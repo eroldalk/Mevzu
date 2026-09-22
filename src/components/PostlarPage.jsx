@@ -22,7 +22,9 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
+import SozHavuzuBattery from "./SozHavuzuBattery";
 import { TEMALAR } from "../utils/tema";
+import { NATURE_PRESETS } from "../remotion/naturePresets.js";
 import { db } from "../utils/firebase";
 import {
   collection,
@@ -72,6 +74,16 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
     }
   });
 
+  // İndirilenler sekmesi her açıldığında yerel depodan en güncel listeyi al
+  useEffect(() => {
+    if (activeTab === "downloads") {
+      try {
+        const posts = JSON.parse(localStorage.getItem("mevzu_postlar") || "[]");
+        setLocalPostlar(posts);
+      } catch (e) {}
+    }
+  }, [activeTab]);
+
   // 1. VERİLERİ ÇEK
   const verileriGetir = async () => {
     setQuotesYukleniyor(true);
@@ -91,6 +103,13 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
           cat: (data.cat || data.category || "FELSEFE").toUpperCase(),
         });
       });
+
+      // "atıldıkça yerleri değişecek": Sıradakiler (used: false) en başta, kullanılanlar altta olsun!
+      qList.sort((a, b) => {
+        if (a.used !== b.used) return a.used ? 1 : -1;
+        return 0;
+      });
+
       setAllQuotes(qList);
     } catch (e) {
       console.warn("Sözler çekilemedi:", e);
@@ -126,6 +145,9 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
     const usedQ = allQuotes.filter((q) => q.used).length;
     const unusedQ = totalQ - usedQ;
     const totalV = videos.length;
+    try {
+      localStorage.setItem("mevzu_quote_stats", JSON.stringify({ unused: unusedQ, total: totalQ }));
+    } catch {}
     return { totalQuotes: totalQ, usedQuotes: usedQ, unusedQuotes: unusedQ, totalVideos: totalV };
   }, [allQuotes, videos]);
 
@@ -257,10 +279,12 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
     }
   };
 
-  // 9. VİDEOYU STÜDYODA AÇ
+  // 9. VİDEOYU STÜDYODA AÇ (0ms Gecikmesiz Doğrudan Veri Aktarımı)
   const openInStudio = (v) => {
     try {
       const targetId = v.videoId || v.id;
+      // Videonun tüm bilgilerini (söz, yazar, tema, müzik) yerel hafızaya kaydet
+      localStorage.setItem("mevzu_active_video", JSON.stringify(v));
       window.history.replaceState({ videoId: targetId }, "", `/${targetId}`);
       if (onOpen) onOpen("remotion");
     } catch (e) {
@@ -464,7 +488,7 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
             }}
           >
             <FileText size={16} />
-            Söz Havuzu ({stats.totalQuotes})
+            Söz Havuzu ({stats.unusedQuotes})
           </button>
 
           <button
@@ -508,6 +532,14 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
             <Download size={16} />
             İndirilen Görseller ({localPostlar.length})
           </button>
+        </div>
+
+        {/* ── SÖZ HAVUZU DİNAMİK ŞARJ ÇUBUĞU (KAPASİTE BİLGİSİ) ── */}
+        <div style={{ maxWidth: 1300, margin: "0 auto" }}>
+          <SozHavuzuBattery
+            unused={stats.unusedQuotes}
+            total={stats.totalQuotes}
+          />
         </div>
       </div>
 
@@ -1077,26 +1109,27 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                         textTransform: "uppercase",
                       }}
                     >
-                      <th style={{ padding: "12px 16px", width: 140 }}>Tarih & Saat</th>
-                      <th style={{ padding: "12px 16px", width: 120 }}>Kategori</th>
-                      <th style={{ padding: "12px 16px" }}>Alıntı & Yazar</th>
-                      <th style={{ padding: "12px 16px", width: 140 }}>Bağlı Söz ID</th>
-                      <th style={{ padding: "12px 16px", width: 140 }}>Durum</th>
-                      <th style={{ padding: "12px 16px", width: 150, textAlign: "right" }}>İşlem</th>
+                      <th style={{ padding: "12px 14px", width: 130 }}>Tarih & Saat</th>
+                      <th style={{ padding: "12px 10px", width: 64 }}>Kapak</th>
+                      <th style={{ padding: "12px 14px", width: 120 }}>Kategori</th>
+                      <th style={{ padding: "12px 14px" }}>Alıntı & Yazar</th>
+                      <th style={{ padding: "12px 14px", width: 130 }}>Bağlı Söz ID</th>
+                      <th style={{ padding: "12px 14px", width: 140 }}>Durum</th>
+                      <th style={{ padding: "12px 14px", width: 140, textAlign: "right" }}>İşlem</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {videosYukleniyor ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: "50px", textAlign: "center", color: "#94a3b8" }}>
+                        <td colSpan={7} style={{ padding: "50px", textAlign: "center", color: "#94a3b8" }}>
                           <Loader2 size={28} className="spin" style={{ margin: "0 auto 8px auto", color: T.gold }} />
                           <div>Videolar getiriliyor...</div>
                         </td>
                       </tr>
                     ) : paginatedVideos.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: "50px", textAlign: "center", color: "#94a3b8" }}>
+                        <td colSpan={7} style={{ padding: "50px", textAlign: "center", color: "#94a3b8" }}>
                           Bu filtreye uygun video bulunamadı.
                         </td>
                       </tr>
@@ -1112,6 +1145,10 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                             })
                           : "Bilinmiyor";
 
+                        const bgKey = v.bgStyle || v.bgId;
+                        const preset = NATURE_PRESETS[bgKey];
+                        const previewUrl = v.coverUrl || v.bgUrl || preset?.url || null;
+
                         return (
                           <tr
                             key={v.id}
@@ -1122,10 +1159,42 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                             }}
                           >
                             {/* Tarih & Saat */}
-                            <td style={{ padding: "12px 16px", verticalAlign: "middle", color: "#94a3b8", fontSize: 12 }}>
+                            <td style={{ padding: "12px 14px", verticalAlign: "middle", color: "#94a3b8", fontSize: 12 }}>
                               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                                 <Clock size={12} /> {dateText}
                               </span>
+                            </td>
+
+                            {/* Kapak Önizleme */}
+                            <td style={{ padding: "10px 10px", verticalAlign: "middle" }}>
+                              <div
+                                onClick={() => openInStudio(v)}
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 8,
+                                  overflow: "hidden",
+                                  border: "1.5px solid rgba(255,255,255,0.12)",
+                                  background: "#12141a",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  position: "relative",
+                                  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+                                }}
+                                title={`${preset?.name || "Kapak"} - Stüdyoda Aç`}
+                              >
+                                {previewUrl ? (
+                                  <img
+                                    src={previewUrl}
+                                    alt=""
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                  />
+                                ) : (
+                                  <Video size={16} color="#64748b" />
+                                )}
+                              </div>
                             </td>
 
                             {/* Kategori */}
@@ -1324,72 +1393,122 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                 <ImageOff size={48} color={T.border} strokeWidth={1.2} />
                 <p style={{ fontSize: 14, color: T.faint, margin: 0 }}>Henüz indirilmiş görsel kart yok</p>
                 <p style={{ fontSize: 11, color: T.fainter, margin: 0, letterSpacing: 1 }}>
-                  Alıntı Kartı Oluştur sayfasından "Kartı İndir" butonuna bastığında buraya eklenir.
+                  Alıntı Kartı Oluştur sayfasından veya Reels Stüdyosu'ndan "Kapak İndir" butonuna bastığında buraya eklenir.
                 </p>
               </div>
             ) : (
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                  gap: 14,
+                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gap: 16,
+                  alignItems: "start",
                 }}
               >
-                {localPostlar.map((p) => (
-                  <div
-                    key={p.id}
-                    style={{
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      background: T.bg2,
-                      border: `1px solid ${T.border}`,
-                    }}
-                  >
-                    <img
-                      src={p.img}
-                      alt=""
-                      style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }}
-                    />
+                {localPostlar.map((p) => {
+                  const is9x16 = p.aspectRatio === "9:16";
+                  return (
                     <div
+                      key={p.id}
                       style={{
-                        padding: "8px 10px 10px",
+                        borderRadius: 14,
+                        overflow: "hidden",
+                        background: T.bg2,
+                        border: `1px solid ${T.border}`,
                         display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
+                        flexDirection: "column",
+                        boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
                       }}
                     >
-                      <span style={{ fontSize: 10, color: T.faint, letterSpacing: 0.5 }}>
-                        {new Date(p.date).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
-                      </span>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() => localIndir(p)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: T.gold,
-                            display: "flex",
-                          }}
-                        >
-                          <Download size={15} />
-                        </button>
-                        <button
-                          onClick={() => localSil(p.id)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: T.fainter,
-                            display: "flex",
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                      <div
+                        style={{
+                          position: "relative",
+                          width: "100%",
+                          aspectRatio: is9x16 ? "9/16" : "1/1",
+                          background: "#08090d",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <img
+                          src={p.img}
+                          alt={p.author || "Görsel"}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                        {p.aspectRatio && (
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: 8,
+                              left: 8,
+                              fontSize: 9,
+                              fontWeight: 800,
+                              padding: "2px 7px",
+                              borderRadius: 6,
+                              background: "rgba(0,0,0,0.75)",
+                              color: is9x16 ? "#38bdf8" : "#f5c542",
+                              border: `1px solid ${is9x16 ? "rgba(56,189,248,0.4)" : "rgba(245,197,66,0.4)"}`,
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            {p.aspectRatio} KAPAK
+                          </span>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          padding: "10px 12px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: "rgba(0,0,0,0.2)",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#e2e8f0" }}>
+                            {p.author || "Mevzu"}
+                          </div>
+                          <div style={{ fontSize: 10, color: T.faint, letterSpacing: 0.5 }}>
+                            {new Date(p.date).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            onClick={() => localIndir(p)}
+                            style={{
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: 6,
+                              padding: "5px 7px",
+                              cursor: "pointer",
+                              color: T.gold,
+                              display: "flex",
+                            }}
+                            title="İndir"
+                          >
+                            <Download size={14} />
+                          </button>
+                          <button
+                            onClick={() => localSil(p.id)}
+                            style={{
+                              background: "rgba(239,68,68,0.1)",
+                              border: "1px solid rgba(239,68,68,0.2)",
+                              borderRadius: 6,
+                              padding: "5px 7px",
+                              cursor: "pointer",
+                              color: "#ef4444",
+                              display: "flex",
+                            }}
+                            title="Sil"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
