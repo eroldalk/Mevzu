@@ -2,6 +2,47 @@ import React, { useState, useEffect } from "react";
 import { db } from "../utils/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
+const CYCLE_DAYS = 60;
+const CYCLE_MS = CYCLE_DAYS * 24 * 60 * 60 * 1000;
+
+function getCycleStart() {
+  try {
+    const saved = localStorage.getItem("mevzu_token_cycle_start");
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+  } catch {}
+  const now = Date.now();
+  try {
+    localStorage.setItem("mevzu_token_cycle_start", now.toString());
+  } catch {}
+  return now;
+}
+
+function calculateCountdown(startMs) {
+  const now = Date.now();
+  const elapsed = now - startMs;
+
+  // 60 gün bittiğinde otomatik olarak sıfırdan tekrar başlasın
+  let currentStart = startMs;
+  if (elapsed >= CYCLE_MS) {
+    const cyclesPassed = Math.floor(elapsed / CYCLE_MS);
+    currentStart = startMs + cyclesPassed * CYCLE_MS;
+    try {
+      localStorage.setItem("mevzu_token_cycle_start", currentStart.toString());
+    } catch {}
+  }
+
+  const remainingMs = Math.max(0, currentStart + CYCLE_MS - now);
+  const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  const minutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+  const seconds = Math.floor((remainingMs % (60 * 1000)) / 1000);
+
+  return { days, hours, minutes, seconds, remainingMs };
+}
+
 export default function SozHavuzuBattery({
   unused,
   total,
@@ -16,6 +57,16 @@ export default function SozHavuzuBattery({
     } catch {}
     return { unused: unused ?? 195, total: total ?? 203 };
   });
+
+  // 60 Günlük Döngü Sayacı
+  const [countdown, setCountdown] = useState(() => calculateCountdown(getCycleStart()));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(calculateCountdown(getCycleStart()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Eğer prop olarak verilmişse onu kullan
   const unusedCount = unused !== undefined ? unused : stats.unused;
@@ -50,10 +101,7 @@ export default function SozHavuzuBattery({
   const usedCount = Math.max(0, totalCount - unusedCount);
   const gunlukTahmin = Math.floor(unusedCount / 6); // Günde 6 video yayınlanıyor
 
-  // Renk Kademesi:
-  // %50+: Zümrüt Yeşili (Geniş Kapasite)
-  // %20 - %49: Altın Kehribar (Orta Seviye)
-  // <%20: Kırmızı/Rose (Tükenmek Üzere)
+  // Renk Kademesi
   const isHigh = pct >= 50;
   const isMedium = pct >= 20 && pct < 50;
   const color = isHigh ? "#10b981" : isMedium ? "#f59e0b" : "#ef4444";
@@ -68,12 +116,12 @@ export default function SozHavuzuBattery({
     return (
       <div
         onClick={onClick}
-        title={`Söz Havuzu: ${unusedCount} hazır / ${totalCount} toplam (${pct}% kapasite · ~${gunlukTahmin} günlük yakıt)`}
+        title={`Söz Havuzu: ${unusedCount} hazır / ${totalCount} toplam (${pct}% kapasite) · 60 Günlük Döngü: ${countdown.days}g ${countdown.hours}s kaldı`}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 8,
-          background: "rgba(18, 20, 28, 0.75)",
+          background: "rgba(18, 20, 28, 0.8)",
           backdropFilter: "blur(10px)",
           border: `1px solid ${color}35`,
           borderRadius: 20,
@@ -122,10 +170,23 @@ export default function SozHavuzuBattery({
         </div>
 
         {/* Bilgi Metni */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ fontSize: 12, fontWeight: 800, color }}>%{pct}</span>
           <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>
-            ({unusedCount} Söz)
+            ({unusedCount})
+          </span>
+          <span style={{ fontSize: 10, color: "#475569" }}>·</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#38bdf8",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            ⏱️ {countdown.days}g
           </span>
         </div>
       </div>
@@ -215,25 +276,56 @@ export default function SozHavuzuBattery({
           </span>
         </div>
 
-        {/* Sağ Taraf: Kalan Gün Tahmini + Yüzde Rozeti */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Sağ Taraf: 60 Gün Geri Sayım + Günlük Yakıt + % Yüzde */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* 60 GÜNLÜK OTOMATİK DÖNGÜ GERİ SAYIMI */}
+          <div
+            title={`60 Günlük Güvenlik / Meta Döngüsü: ${countdown.days} gün ${countdown.hours} sa ${countdown.minutes} dk ${countdown.seconds} sn kaldı. Sıfırlandığında otomatik olarak baştan başlar.`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(56, 189, 248, 0.08)",
+              border: "1px solid rgba(56, 189, 248, 0.25)",
+              padding: "3px 10px",
+              borderRadius: 8,
+              boxShadow: "0 0 10px rgba(56, 189, 248, 0.12)",
+            }}
+          >
+            <span style={{ fontSize: 11 }}>⏱️</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#38bdf8" }}>
+              60G Sayaç:
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#f8fafc",
+                fontFamily: "monospace",
+                letterSpacing: 0.5,
+              }}
+            >
+              {countdown.days}g {String(countdown.hours).padStart(2, "0")}s {String(countdown.minutes).padStart(2, "0")}d {String(countdown.seconds).padStart(2, "0")}sn
+            </span>
+          </div>
+
           {gunlukTahmin > 0 && (
             <span
               style={{
                 fontSize: 11,
                 background: "rgba(255, 255, 255, 0.04)",
                 color: "#94a3b8",
-                padding: "2px 8px",
+                padding: "3px 8px",
                 borderRadius: 6,
                 border: "1px solid rgba(255, 255, 255, 0.06)",
                 fontWeight: 500,
               }}
             >
-              ⏳ ~{gunlukTahmin} günlük yakıt (günde 6 video)
+              ⏳ ~{gunlukTahmin} günlük yakıt
             </span>
           )}
 
-          {/* % Yüzde Kutusu (Kullanıcının çizdiği % 80 gibi) */}
+          {/* % Yüzde Kutusu */}
           <div
             style={{
               display: "flex",
@@ -241,7 +333,7 @@ export default function SozHavuzuBattery({
               gap: 3,
               background: `rgba(${isHigh ? "16,185,129" : isMedium ? "245,158,11" : "239,68,68"}, 0.14)`,
               border: `1px solid ${color}50`,
-              padding: "2px 9px",
+              padding: "3px 9px",
               borderRadius: 8,
               boxShadow: `0 0 10px ${glow}`,
             }}
