@@ -87,17 +87,15 @@ async function determineActiveSlot() {
     return null;
   }
 
-  // Firestore'dan bugünün yayınlanmış videolarını çek (videos koleksiyonu)
+  // Firestore'dan doğrudan BUGÜNÜN yayınlanmış videolarını çek (Tarih bazlı güvenli filtre)
   const videosRef = collection(db, "videos");
-  const q = query(videosRef, where("published", "==", true), limit(50));
+  const q = query(videosRef, where("date", "==", dateStr), where("published", "==", true));
   const snap = await getDocs(q);
   
   const publishedSlotIds = new Set();
   snap.forEach(d => {
     const data = d.data();
-    // Video bugün yayınlandıysa ve bir slotId'si varsa
-    const videoDate = data.date || (data.publishedAt ? data.publishedAt.slice(0, 10) : (data.renderedAt ? data.renderedAt.slice(0, 10) : ""));
-    if (videoDate === dateStr && data.slotId) {
+    if (data.slotId) {
       publishedSlotIds.add(data.slotId);
     }
   });
@@ -171,8 +169,8 @@ function getMusicForCategory(categoryStr = "") {
   };
 }
 
-// 1. Firestore'dan kullanılmamış sıradaki sözü çek
-async function fetchUnusedQuote(slotId = "MANUAL", dateStr = "") {
+// 1. Firestore'dan kullanılmamış sıradaki sözü çek (Sadece okur, erken harcamaz!)
+async function fetchUnusedQuote() {
   console.log("🔍 Firestore'dan kullanılmamış söz aranıyor...");
   const quotesRef = collection(db, "quotes");
   const q = query(quotesRef, where("used", "!=", true), limit(10));
@@ -200,17 +198,7 @@ async function fetchUnusedQuote(slotId = "MANUAL", dateStr = "") {
   }
 
   const data = selectedDoc.data();
-  try {
-    await updateDoc(doc(db, "quotes", selectedDoc.id), {
-      used: true,
-      usedAt: new Date().toISOString(),
-      usedSlot: slotId,
-      usedDate: dateStr,
-    });
-    console.log(`✅ Söz damgalandı: ID [${selectedDoc.id}] (Slot: ${slotId}, Tarih: ${dateStr})`);
-  } catch (err) {
-    console.warn("Söz durumu güncellenirken uyarı:", err.message);
-  }
+  console.log(`📖 Söz seçildi (henüz harcanmadı): ID [${selectedDoc.id}]`);
 
   return {
     id: selectedDoc.id,
@@ -218,6 +206,23 @@ async function fetchUnusedQuote(slotId = "MANUAL", dateStr = "") {
     author: data.author || "Mevzu",
     cat: data.cat ? data.cat.toUpperCase() : "FELSEFE",
   };
+}
+
+// Sözü SADECE Instagram yayını başarılı olduktan sonra mühürle!
+async function markQuoteAsUsed(quoteId, slotId, dateStr, videoId) {
+  if (!quoteId) return;
+  try {
+    await updateDoc(doc(db, "quotes", quoteId), {
+      used: true,
+      usedAt: new Date().toISOString(),
+      usedSlot: slotId,
+      usedDate: dateStr,
+      usedInVideoId: videoId,
+    });
+    console.log(`🔒 [SÖZ MÜHÜRLENDİ] quotes/${quoteId} başarıyla 'used: true' yapıldı.`);
+  } catch (err) {
+    console.warn("⚠️ Söz durumu güncellenirken uyarı:", err.message);
+  }
 }
 
 // 65 Adet Arka Plan Havuzundan Kategoriye Uygun Zengin ve Tekrarsız Seçici
@@ -417,37 +422,45 @@ async function main() {
     console.warn("Firestore video kaydı yazılamadı:", err.message);
   }
 
-  // 7. Instagram'a gönder (Token varsa)
+  // 7. Instagram'a gönder
   let instagramPostId = null;
+  const isCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
   const hasToken = process.env.INSTAGRAM_ACCOUNT_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
+
   if (hasToken) {
+    console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
     try {
-      console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
       instagramPostId = await uploadAndPublishReel({
         videoFilePath: outputLocation,
         caption,
         thumbOffset: 2500,
       });
     } catch (uploadErr) {
-      console.error("❌ Instagram Reels yükleme hatası:", uploadErr.message);
+      console.error("❌ [KRİTİK HATA] Instagram Reels yüklenemedi:", uploadErr.message);
+      throw uploadErr; // GitHub Actions'ı kırmızıya düşür, hatayı gizleme!
     }
   } else {
-    console.log("ℹ️  [BİLGİ] INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN tanımlı değil.");
-    console.log("    Video yerel 'output/' klasörüne kaydedildi.");
+    if (isCi) {
+      throw new Error("❌ [KRİTİK HATA] GitHub Actions ortamında INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik!");
+    }
+    console.log("ℹ️  [LOKAL BİLGİ] Instagram tokenları tanımlı değil. Video yerel 'output/' klasörüne kaydedildi.");
   }
 
-  // 8. Yayın başarılıysa Slotu ve Video kaydını mühürle (Çift paylaşımı engelleyen kilit)
+  // 8. Yayın BAŞARILI ise Slotu, Videoyu ve Sözü Mühürle!
   if (instagramPostId) {
     try {
-      // Videos koleksiyonunu güncelle ve kilitle
+      // 1. Videolar koleksiyonunu kalıcı mühürle
       await updateDoc(doc(db, "videos", videoId), {
         instagramId: instagramPostId,
         published:   true,
         publishedAt: new Date().toISOString(),
       });
-      console.log(`🔒 [SLOT MÜHÜRLENDİ] videos/${videoId} güncellendi: slotId=${currentSlotId}, instagramId=${instagramPostId}`);
+      console.log(`🔒 [VİDEO MÜHÜRLENDİ] videos/${videoId} güncellendi: slotId=${currentSlotId}, instagramId=${instagramPostId}`);
+
+      // 2. Sözü 'used: true' olarak mühürle (Söz ancak şimdi harcanır!)
+      await markQuoteAsUsed(quoteData.id, currentSlotId, currentDateStr, videoId);
     } catch (err) {
-      console.warn("Slot veya video durumu güncellenirken uyarı:", err.message);
+      console.warn("⚠️ Veritabanı mühürleme güncellenirken uyarı:", err.message);
     }
   }
 

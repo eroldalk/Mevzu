@@ -31,8 +31,8 @@ jobs:
           node-version: 22
           cache: "npm"
 
-      - name: 📦 NPM Bağımlılıklarını Kur
-        run: npm install
+      - name: 📦 NPM Bağımlılıklarını Kur (Temiz Kurulum)
+        run: npm ci
 
       - name: 🌐 Remotion Tarayıcı Motorunu Hazırla
         run: npx remotion browser ensure
