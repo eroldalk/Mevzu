@@ -130,7 +130,7 @@ export async function uploadAndPublishReel({ videoFilePath, caption, thumbOffset
 
 // Test amaçlı doğrudan çalıştırıldığında:
 const sampleVideo = path.join(rootDir, "output", "reel_20260916_2303_M4L0.mp4");
-const sampleCaption = `Niccolò Machiavelli — Prens (GÜÇ & STRATEJİ).
+const sampleCaption = `Niccolò Machiavelli — Prens.
 
 Bir insanı tanımak mı istiyorsun, yoksa ona güç verdiğinde neye dönüşeceğini izlemek mi?
 

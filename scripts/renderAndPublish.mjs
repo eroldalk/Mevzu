@@ -8,7 +8,7 @@
 // 6. Instagram Graph API (Reels Publishing) ile doğrudan yayına alır.
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, doc, updateDoc, setDoc, limit } from "firebase/firestore";
+import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, runTransaction, limit } from "firebase/firestore";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, renderStill } from "@remotion/renderer";
 import { generateInstagramCaption } from "./generateCaption.mjs";
@@ -70,90 +70,166 @@ function getTurkeyNow() {
   return { dateStr, hour, minute, currentMinutes, trDate };
 }
 
-// Yayınlanması gereken ama gecikmiş/atlanmış ilk slotu bul
+// ─── Atomik Slot Kilidi (Çift Çalışmayı & Yarış Durumlarını Kesin Önler) ─────
+async function acquireSlotLock(dateStr, slotId) {
+  const lockKey = `${dateStr}_${slotId.replace(":", "")}`;
+  const lockRef = doc(db, "slot_locks", lockKey);
+  const runnerId = process.env.GITHUB_RUN_ID || `local_${Date.now()}`;
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const lockDoc = await transaction.get(lockRef);
+      const nowMs = Date.now();
+
+      if (lockDoc.exists()) {
+        const data = lockDoc.data();
+
+        // 1. Slot bugün zaten başarıyla yayınlandıysa kesinlikle işlem yapma
+        if (data.status === "published") {
+          return { acquired: false, reason: "already_published" };
+        }
+
+        // 2. Başka bir işlem şu an bu slot üzerinde çalışıyorsa
+        if (data.status === "processing") {
+          const lockedAtMs = data.lockedAt ? new Date(data.lockedAt).getTime() : 0;
+          // Kilit 20 dakikadan yeniyse diğer işlem aktiftir, mükerrer yayını önlemek için çekil
+          if (nowMs - lockedAtMs < 20 * 60 * 1000) {
+            return { acquired: false, reason: "currently_processing", lockedAt: data.lockedAt };
+          }
+          console.warn(`⚠️ [KİLİT AŞIMI] Önceki kilit 20 dakikadır yanıt vermiyor. Zaman aşımı nedeniyle devralınıyor.`);
+        }
+      }
+
+      // Kilidi bu çalıştırma için atomik olarak al
+      transaction.set(lockRef, {
+        slotId,
+        date: dateStr,
+        status: "processing",
+        lockedAt: new Date().toISOString(),
+        runnerId,
+      });
+
+      return { acquired: true, runnerId };
+    });
+
+    return result;
+  } catch (err) {
+    console.error("❌ Slot kilidi alınırken hata:", err.message);
+    return { acquired: false, reason: "error", error: err.message };
+  }
+}
+
+async function finalizeSlotLockSuccess(dateStr, slotId, videoId, instagramId) {
+  try {
+    const lockKey = `${dateStr}_${slotId.replace(":", "")}`;
+    const lockRef = doc(db, "slot_locks", lockKey);
+    await setDoc(lockRef, {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+      videoId,
+      instagramId,
+    }, { merge: true });
+    console.log(`🔒 [SLOT KİLİDİ MÜHÜRLENDİ] slot_locks/${lockKey} 'published' yapıldı.`);
+  } catch (err) {
+    console.warn("⚠️ Slot kilidi mühürlenirken uyarı:", err.message);
+  }
+}
+
+async function releaseSlotLockOnFailure(dateStr, slotId, errorMessage) {
+  try {
+    const lockKey = `${dateStr}_${slotId.replace(":", "")}`;
+    const lockRef = doc(db, "slot_locks", lockKey);
+    await setDoc(lockRef, {
+      status: "failed",
+      failedAt: new Date().toISOString(),
+      error: errorMessage || "Bilinmeyen hata",
+    }, { merge: true });
+    console.log(`🔓 [SLOT KİLİDİ SERBEST] Hata nedeniyle kilit 'failed' yapıldı; sonraki cron tekrar deneyebilir.`);
+  } catch (err) {
+    console.warn("⚠️ Slot kilidi serbest bırakılırken uyarı:", err.message);
+  }
+}
+
+// Yayınlanması gereken ama gecikmiş/atlanmış aktif slotu bul (Asla erken yayın yapmaz!)
 async function determineActiveSlot() {
   const { dateStr, hour, minute, currentMinutes } = getTurkeyNow();
-  console.log(`🕒 Türkiye Saati: ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} (Tarih: ${dateStr})`);
+  const timeFormatted = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  console.log(`🕒 Türkiye Saati: ${timeFormatted} (Tarih: ${dateStr})`);
 
-  // Zamanı gelmiş, 7 dakika yaklaşmış veya geçmiş olan slotları filtrele (Erken Tolerans Penceresi)
-  const eligibleSlots = DAILY_SLOTS.filter(s => {
-    const slotMinutes = s.hour * 60 + s.minute;
-    // Slota 7 dakika kalmışsa veya saat geçmişse aktif kabul et (Örn: 13:30 için 13:23'ten itibaren geçerli)
-    return currentMinutes >= (slotMinutes - 7);
-  });
-
-  if (eligibleSlots.length === 0) {
-    console.log("ℹ️  Günün ilk yayın saati (08:30) henüz gelmedi. Bekleniyor.");
+  // Günün ilk yayın saati (08:30) gelmediyse kesinlikle bekle
+  const firstSlotMinutes = DAILY_SLOTS[0].hour * 60 + DAILY_SLOTS[0].minute;
+  if (currentMinutes < firstSlotMinutes) {
+    console.log(`ℹ️  Günün ilk yayın saati (${DAILY_SLOTS[0].id}) henüz gelmedi. Bekleniyor.`);
     return null;
   }
 
-  // Firestore'dan doğrudan BUGÜNÜN yayınlanmış videolarını çek (Tarih bazlı güvenli filtre)
-  const videosRef = collection(db, "videos");
-  const q = query(videosRef, where("date", "==", dateStr), where("published", "==", true));
-  const snap = await getDocs(q);
-  
-  const publishedSlotIds = new Set();
-  snap.forEach(d => {
-    const data = d.data();
-    if (data.slotId) {
-      publishedSlotIds.add(data.slotId);
-    }
-  });
-
-  console.log(`📊 Bugün 'videos' deposuna kaydedilen slotlar: [${Array.from(publishedSlotIds).join(", ") || "Henüz yok"}]`);
-
-  // Zamanı geçmiş ama henüz yayınlanmamış İLK slotu bul (Eksik/Geciken slot)
-  for (const slot of eligibleSlots) {
-    if (!publishedSlotIds.has(slot.id)) {
-      console.log(`🚨 [YAYIN GEREKİYOR] Zamanı geçmiş/gelmiş eksik slot tespit edildi: ${slot.id} (${slot.name})`);
-      return { slot, dateStr, isCatchUp: true };
+  // Şu anki zamana denk gelen veya zamanı geçmiş aktif slotu tespit et (ASLA ERKEN YAYIN YOK!)
+  let candidateSlot = null;
+  for (let i = DAILY_SLOTS.length - 1; i >= 0; i--) {
+    const s = DAILY_SLOTS[i];
+    const sMinutes = s.hour * 60 + s.minute;
+    if (currentMinutes >= sMinutes) {
+      candidateSlot = s;
+      break;
     }
   }
 
-  console.log("✅ Bu saate kadar planlanan tüm yayınlar zaten başarıyla yapılmış. İşlem gerekmiyor.");
-  return null;
+  if (!candidateSlot) {
+    console.log("ℹ️  Aktif slot bulunamadı.");
+    return null;
+  }
+
+  console.log(`🎯 İncelenen Aktif Slot: [${candidateSlot.id}] — ${candidateSlot.name}`);
+
+  // 1. Kontrol: 'videos' koleksiyonunda bu slot bugün yayınlanmış mı?
+  const videosRef = collection(db, "videos");
+  const qVideos = query(
+    videosRef, 
+    where("date", "==", dateStr), 
+    where("slotId", "==", candidateSlot.id), 
+    where("published", "==", true)
+  );
+  const snapVideos = await getDocs(qVideos);
+  if (!snapVideos.empty) {
+    console.log(`✅ [${candidateSlot.id}] slotu bugün zaten başarıyla yayınlanmış (videos tablosunda mevcut). İşlem gerekmiyor.`);
+    return null;
+  }
+
+  // 2. Kontrol: 'slot_locks' koleksiyonunda bu slot yayınlanmış veya işleniyor mu?
+  const lockKey = `${dateStr}_${candidateSlot.id.replace(":", "")}`;
+  const lockRef = doc(db, "slot_locks", lockKey);
+  const snapLock = await getDoc(lockRef);
+  if (snapLock.exists()) {
+    const lockData = snapLock.data();
+    if (lockData.status === "published") {
+      console.log(`✅ [${candidateSlot.id}] slotu kilit tablosunda 'published' olarak mühürlü. İşlem gerekmiyor.`);
+      return null;
+    }
+    if (lockData.status === "processing") {
+      const nowMs = Date.now();
+      const lockedAtMs = lockData.lockedAt ? new Date(lockData.lockedAt).getTime() : 0;
+      if (nowMs - lockedAtMs < 20 * 60 * 1000) {
+        console.log(`⏳ [${candidateSlot.id}] slotu şu anda başka bir işlem tarafından üretiliyor/yayınlanıyor (Kilit: ${Math.round((nowMs - lockedAtMs) / 1000)} sn önce alındı). Çift çalışmayı önlemek için çıkılıyor.`);
+        return null;
+      }
+    }
+  }
+
+  console.log(`🚨 [YAYIN GEREKİYOR] [${candidateSlot.id}] slotu için yayın başlatılacak!`);
+  return { slot: candidateSlot, dateStr };
 }
 
-// ─── Doğal Algoritma Jitter Motoru (İnsan Taklidi Gecikme) ──────────────────
-async function applyHumanJitter(slot) {
+// ─── Doğal Algoritma Jitter Motoru (Hafif İnsan Taklidi Gecikme) ───────────
+async function applyHumanJitter() {
   if (process.env.FORCE_PUBLISH === "true") {
-    console.log("⚡ [MANUEL MOD]: Jitter atlanıyor, anında yayınlanacak.");
+    console.log("⚡ [MANUEL MOD]: Jitter atlanıyor.");
     return;
   }
 
-  const { currentMinutes } = getTurkeyNow();
-  const slotMinutes = slot.hour * 60 + slot.minute;
-
-  // Hedef dakika penceresi: Slotun 5 dakika öncesi ile 4 dakika sonrası arası (Örn: 13:25 - 13:34)
-  // [-5, +4] aralığında rastgele bir ofset seç
-  const randomOffset = Math.floor(Math.random() * (4 - (-5) + 1)) + (-5);
-  const targetMinuteOfDay = slotMinutes + randomOffset;
-  
-  // Hedefe kalan dakika farkını hesapla
-  const diffMinutes = targetMinuteOfDay - currentMinutes;
-
-  if (diffMinutes <= 0) {
-    console.log(`⚡ Zaman zaten hedefe ulaştı/geçti (${slot.id} slotu). Jitter beklemesi yapmadan anında başlanıyor.`);
-    return;
-  }
-
-  // Kalan dakikayı saniyeye çevirip ilave rastgele saniyeler ekle (0 - 45 sn)
-  const waitSeconds = Math.min(diffMinutes * 60 + Math.floor(Math.random() * 45), 600);
-  const mins = Math.floor(waitSeconds / 60);
-  const secs = waitSeconds % 60;
-
-  const targetHour = Math.floor(targetMinuteOfDay / 60);
-  const targetMin = targetMinuteOfDay % 60;
-  const targetTimeFormatted = `${String(targetHour).padStart(2, "0")}:${String(targetMin).padStart(2, "0")}`;
-
-  console.log("--------------------------------------------------");
-  console.log(`🎲 [DOĞAL JITTER]: Instagram spam koruması için insan taklidi devrede!`);
-  console.log(`🕒 Hedef Slot: [${slot.id}] | Bugünkü Doğal Yayın Saati: ${targetTimeFormatted}`);
-  console.log(`⏳ Kalan bekleme: ${mins} dakika ${secs} saniye...`);
-  console.log("--------------------------------------------------");
-
+  // Instagram bot filtrelerine takılmamak ve trafiği dağıtmak için 5 - 20 saniye arası mikro bekleme
+  const waitSeconds = Math.floor(Math.random() * 16) + 5;
+  console.log(`⏳ Doğal insan taklidi ve API güvenliği için ${waitSeconds} saniye bekleniyor...`);
   await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
-  console.log(`🚀 [${targetTimeFormatted}] Geldi! Video üretimi ve canlı yayın başlatılıyor...`);
 }
 
 // ─── 170 Adet Doğrulanmış Mixkit Müzik Seçici ───────────────────────────
@@ -334,7 +410,7 @@ async function main() {
   console.log("🚀 #MEVZU OTONOM YAYIN MOTORU BAŞLATILDI");
   console.log("==========================================");
 
-  // 0. Akıllı Slot & Gecikme Kontrolü
+  // 0. Akıllı Slot & Zaman Kontrolü
   // Eğer FORCE_PUBLISH ortam değişkeni verilmişse kontrolü atlar (manuel test modu)
   const isForce = process.env.FORCE_PUBLISH === "true";
   let activeSlotInfo = null;
@@ -342,8 +418,8 @@ async function main() {
   if (!isForce) {
     activeSlotInfo = await determineActiveSlot();
     if (!activeSlotInfo) {
-      console.log("⏸️  Şu an yayınlanması gereken gecikmiş veya aktif bir slot bulunmuyor.");
-      console.log("✨ Sistem güvenle kapatılıyor. Bir sonraki tetiklemede görüşmek üzere!");
+      console.log("⏸️  Şu an yayınlanması gereken bir slot bulunmuyor.");
+      console.log("✨ Sistem güvenle kapatılıyor. Bir sonraki kontrolde görüşmek üzere!");
       return;
     }
   } else {
@@ -356,117 +432,142 @@ async function main() {
 
   console.log(`🎯 Hedef Slot: [${currentSlotId}] — ${currentSlotName}`);
 
-  // Doğal Algoritma Jitter'ı (Her gün farklı dakikada yayınlanması için rastgele bekleme)
-  if (activeSlotInfo) {
-    await applyHumanJitter(activeSlotInfo.slot);
+  // 0.1 Atomik Slot Kilidini Al (Eğer manuel değilse)
+  if (activeSlotInfo && currentSlotId !== "MANUAL") {
+    console.log(`🔒 [KİLİT KONTROLÜ] slot_locks/${currentDateStr}_${currentSlotId.replace(":", "")} kilidi isteniyor...`);
+    const lockResult = await acquireSlotLock(currentDateStr, currentSlotId);
+    if (!lockResult.acquired) {
+      console.log(`⏸️  Slot kilidi alınamadı (Sebep: ${lockResult.reason}). Başka bir işlem devrede veya slot zaten yayınlanmış.`);
+      return;
+    }
+    console.log(`🔑 Slot kilidi başarıyla bu işlem için mühürlendi (Runner: ${lockResult.runnerId}).`);
   }
 
-  // 1. Benzersiz video ID üret
-  const videoId = generateVideoId();
-  console.log(`🆔 Video ID: ${videoId}`);
-
-  // 2. Sözü çek
-  const quoteData = await fetchUnusedQuote(currentSlotId, currentDateStr);
-  console.log(`📖 Söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
-
-  // 3. Pixabay'den kategoriye uygun müzik seç
-  console.log("🎵 Pixabay'den müzik seçiliyor...");
-  const musicData = await getMusicForCategory(quoteData.cat);
-  console.log(`🎵 Seçilen: ${musicData.musicId} (${musicData.source}) → ${musicData.musicUrl}`);
-
-  // 4. Açıklamayı Gemini AI ile üret
-  console.log("✍️  Gemini AI ile Instagram açıklaması üretiliyor...");
-  const caption = await generateInstagramCaption({
-    quote: quoteData.quote,
-    author: quoteData.author,
-    category: quoteData.cat,
-  });
-
-  console.log("\n--- ÜRETİLEN INSTAGRAM AÇIKLAMASI ---");
-  console.log(caption);
-  console.log("------------------------------------\n");
-
-  // 5. Videoyu renderla
-  const { outputLocation, fileName, bgId, coverFileName } = await renderReelsVideo({
-    quote: quoteData.quote,
-    author: quoteData.author,
-    category: quoteData.cat,
-    videoId,
-    musicUrl: musicData.musicUrl,
-    musicId: musicData.musicId,
-  });
-
-  // 6. Firestore'a video kaydı yaz
+  // Kritik işlem bloğu: Hata durumunda kilidi serbest bırakır ve bildirim verir
   try {
-    await setDoc(doc(db, "videos", videoId), {
-      videoId,
-      quoteId:       quoteData.id || null,
-      quote:         quoteData.quote,
-      author:        quoteData.author,
-      category:      quoteData.cat,
-      slotId:        currentSlotId,
-      slotName:      currentSlotName,
-      date:          currentDateStr,
-      musicId:       musicData.musicId,
-      musicUrl:      musicData.musicUrl,
-      musicSource:   musicData.source || "mixkit",
-      bgId,
-      fileName,
-      coverFileName: coverFileName || null,
-      renderedAt:    new Date().toISOString(),
-      instagramId:   null,   // Yayınlanınca güncellenir
-      published:     false,
+    // Doğal Algoritma Jitter'ı (5-20 saniye mikro bekleme)
+    if (activeSlotInfo) {
+      await applyHumanJitter();
+    }
+
+    // 1. Benzersiz video ID üret
+    const videoId = generateVideoId();
+    console.log(`🆔 Video ID: ${videoId}`);
+
+    // 2. Sözü çek (SADECE OKUR, henüz harcamaz!)
+    const quoteData = await fetchUnusedQuote(currentSlotId, currentDateStr);
+    console.log(`📖 Söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
+
+    // 3. Pixabay'den kategoriye uygun müzik seç
+    console.log("🎵 Müzik seçiliyor...");
+    const musicData = await getMusicForCategory(quoteData.cat);
+    console.log(`🎵 Seçilen: ${musicData.musicId} (${musicData.source}) → ${musicData.musicUrl}`);
+
+    // 4. Açıklamayı Gemini AI ile üret (Kategori parantezi olmadan temiz)
+    console.log("✍️  Instagram açıklaması üretiliyor...");
+    const caption = await generateInstagramCaption({
+      quote: quoteData.quote,
+      author: quoteData.author,
+      category: quoteData.cat,
     });
-    console.log(`💾 Firestore video kaydı oluşturuldu: videos/${videoId}`);
-  } catch (err) {
-    console.warn("Firestore video kaydı yazılamadı:", err.message);
-  }
 
-  // 7. Instagram'a gönder
-  let instagramPostId = null;
-  const isCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
-  const hasToken = process.env.INSTAGRAM_ACCOUNT_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
+    console.log("\n--- ÜRETİLEN INSTAGRAM AÇIKLAMASI ---");
+    console.log(caption);
+    console.log("------------------------------------\n");
 
-  if (hasToken) {
-    console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
+    // 5. Videoyu renderla
+    const { outputLocation, fileName, bgId, coverFileName } = await renderReelsVideo({
+      quote: quoteData.quote,
+      author: quoteData.author,
+      category: quoteData.cat,
+      videoId,
+      musicUrl: musicData.musicUrl,
+      musicId: musicData.musicId,
+    });
+
+    // 6. Firestore'a video kaydı yaz
     try {
-      instagramPostId = await uploadAndPublishReel({
-        videoFilePath: outputLocation,
-        caption,
-        thumbOffset: 2500,
+      await setDoc(doc(db, "videos", videoId), {
+        videoId,
+        quoteId:       quoteData.id || null,
+        quote:         quoteData.quote,
+        author:        quoteData.author,
+        category:      quoteData.cat,
+        slotId:        currentSlotId,
+        slotName:      currentSlotName,
+        date:          currentDateStr,
+        musicId:       musicData.musicId,
+        musicUrl:      musicData.musicUrl,
+        musicSource:   musicData.source || "mixkit",
+        bgId,
+        fileName,
+        coverFileName: coverFileName || null,
+        renderedAt:    new Date().toISOString(),
+        instagramId:   null,   // Yayınlanınca güncellenir
+        published:     false,
       });
-    } catch (uploadErr) {
-      console.error("❌ [KRİTİK HATA] Instagram Reels yüklenemedi:", uploadErr.message);
-      throw uploadErr; // GitHub Actions'ı kırmızıya düşür, hatayı gizleme!
-    }
-  } else {
-    if (isCi) {
-      throw new Error("❌ [KRİTİK HATA] GitHub Actions ortamında INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik!");
-    }
-    console.log("ℹ️  [LOKAL BİLGİ] Instagram tokenları tanımlı değil. Video yerel 'output/' klasörüne kaydedildi.");
-  }
-
-  // 8. Yayın BAŞARILI ise Slotu, Videoyu ve Sözü Mühürle!
-  if (instagramPostId) {
-    try {
-      // 1. Videolar koleksiyonunu kalıcı mühürle
-      await updateDoc(doc(db, "videos", videoId), {
-        instagramId: instagramPostId,
-        published:   true,
-        publishedAt: new Date().toISOString(),
-      });
-      console.log(`🔒 [VİDEO MÜHÜRLENDİ] videos/${videoId} güncellendi: slotId=${currentSlotId}, instagramId=${instagramPostId}`);
-
-      // 2. Sözü 'used: true' olarak mühürle (Söz ancak şimdi harcanır!)
-      await markQuoteAsUsed(quoteData.id, currentSlotId, currentDateStr, videoId);
+      console.log(`💾 Firestore video kaydı oluşturuldu: videos/${videoId}`);
     } catch (err) {
-      console.warn("⚠️ Veritabanı mühürleme güncellenirken uyarı:", err.message);
+      console.warn("Firestore video kaydı yazılamadı:", err.message);
     }
-  }
 
-  console.log("==========================================");
-  console.log(`✅ TAMAMLANDI → Slot: [${currentSlotId}] | Video: ${videoId}`);
-  console.log("==========================================");
+    // 7. Instagram'a gönder
+    let instagramPostId = null;
+    const isCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+    const hasToken = process.env.INSTAGRAM_ACCOUNT_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
+
+    if (hasToken) {
+      console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
+      try {
+        instagramPostId = await uploadAndPublishReel({
+          videoFilePath: outputLocation,
+          caption,
+          thumbOffset: 2500,
+        });
+      } catch (uploadErr) {
+        console.error("❌ [KRİTİK HATA] Instagram Reels yüklenemedi:", uploadErr.message);
+        throw uploadErr; // GitHub Actions'ı kırmızıya düşür, hatayı gizleme!
+      }
+    } else {
+      if (isCi) {
+        throw new Error("❌ [KRİTİK HATA] GitHub Actions ortamında INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik!");
+      }
+      console.log("ℹ️  [LOKAL BİLGİ] Instagram tokenları tanımlı değil. Video yerel 'output/' klasörüne kaydedildi.");
+    }
+
+    // 8. Yayın BAŞARILI ise Slotu, Videoyu ve Sözü Mühürle!
+    if (instagramPostId) {
+      try {
+        // 1. Videolar koleksiyonunu kalıcı mühürle
+        await updateDoc(doc(db, "videos", videoId), {
+          instagramId: instagramPostId,
+          published:   true,
+          publishedAt: new Date().toISOString(),
+        });
+        console.log(`🔒 [VİDEO MÜHÜRLENDİ] videos/${videoId} güncellendi: slotId=${currentSlotId}, instagramId=${instagramPostId}`);
+
+        // 2. Sözü 'used: true' olarak mühürle (Söz ancak şimdi harcanır!)
+        await markQuoteAsUsed(quoteData.id, currentSlotId, currentDateStr, videoId);
+
+        // 3. Atomik slot kilidini 'published' olarak mühürle
+        if (currentSlotId !== "MANUAL") {
+          await finalizeSlotLockSuccess(currentDateStr, currentSlotId, videoId, instagramPostId);
+        }
+      } catch (err) {
+        console.warn("⚠️ Veritabanı mühürleme güncellenirken uyarı:", err.message);
+      }
+    }
+
+    console.log("==========================================");
+    console.log(`✅ TAMAMLANDI → Slot: [${currentSlotId}] | Video: ${videoId}`);
+    console.log("==========================================");
+  } catch (err) {
+    console.error("❌ [AKIŞ HATASI] İşlem sırasında kritik hata:", err.message);
+    if (activeSlotInfo && currentSlotId !== "MANUAL") {
+      await releaseSlotLockOnFailure(currentDateStr, currentSlotId, err.message);
+    }
+    throw err; // GitHub Actions'ın kırmızıya düşmesi için yukarı fırlat
+  }
 }
 
 main().catch((err) => {

@@ -108,12 +108,12 @@ export async function generateInstagramCaption({
   const cleanAuthor = (author || "Mevzu").trim();
   const cleanCat = (category || "FELSEFE").trim().toUpperCase();
 
-  // 1. YAZAR & ESER BİLGİSİ
+  // 1. YAZAR & ESER BİLGİSİ (Kategori parantezi kaldırıldı)
   const authorKey = cleanAuthor.toLowerCase();
   const knownWork = KNOWN_AUTHORS_WORKS[authorKey];
   const baslikSatiri = knownWork
-    ? `${cleanAuthor} — ${knownWork} (${cleanCat}).`
-    : `${cleanAuthor} (${cleanCat}).`;
+    ? `${cleanAuthor} — ${knownWork}.`
+    : `${cleanAuthor}.`;
 
   // 2. GEMINI API VARSA (Çok daha kişiselleştirilmiş derin soru üretir)
   const apiKey =
@@ -131,10 +131,11 @@ Kategori: "${cleanCat}"
 
 KRİTİK KURALLAR:
 1. SÖZÜ AÇIKLAMAYA ASLA YAZMA! Videoda zaten okunuyor.
-2. İlk satır yazar ve eser bilgisi olsun: "${baslikSatiri}"
-3. İkinci kısım: İzleyiciyi düşündüren, yorumlarda tartışma başlatacak ÇOK ÇARPICI, derin ve merak uyandırıcı 1-2 cümlelik bir soru sor (Bu soru söze ve kategoriye tam uysun).
-4. Üçüncü kısım: "Düşünceni yorumlarda belirt 👇\\nKendine hatırlatmak için kaydetmeyi unutma 📌"
-5. Dördüncü kısım: 6-8 adet çok odaklı hashtag (Sözle, yazarla ve kategoriyle ilgili, en sonda #mevzu).
+2. İlk satır yazar ve eser bilgisi olsun: "${baslikSatiri}" (Asla kategori adı ekleme).
+3. Açıklamada, başta veya sonda ASLA (Sanat), (Gündem), (Felsefe) gibi kategori ibaresi YAZMA!
+4. İkinci kısım: İzleyiciyi düşündüren, yorumlarda tartışma başlatacak ÇOK ÇARPICI, derin ve merak uyandırıcı 1-2 cümlelik bir soru sor (Bu soru söze ve kategoriye tam uysun).
+5. Üçüncü kısım: "Düşünceni yorumlarda belirt 👇\nKendine hatırlatmak için kaydetmeyi unutma 📌"
+6. Dördüncü kısım: 6-8 adet çok odaklı hashtag (Sözle, yazarla ve kategoriyle ilgili, en sonda #mevzu).
 
 Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
 
