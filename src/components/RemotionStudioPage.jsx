@@ -8,7 +8,7 @@ import { generateVideoId } from "../utils/pixabayMusic";
 import { getMixkitByCategory, VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibrary";
 import { generateInstagramCaption } from "../utils/captionGenerator";
 import { db } from "../utils/firebase";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { downloadInstagramCover } from "../utils/coverExporter";
 import {
   ArrowLeft,
@@ -374,9 +374,113 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
     }
   };
 
-  // Sayfa ilk açıldığında da her seferinde farklı bir söz ve uyumlu ayarlar gelsin
+  // Sayfa açıldığında: Eğer belirli bir video veya söz talep edilmişse onu yükle; yoksa rastgele sihirli oluştur
   useEffect(() => {
-    sihirliUyumluOlustur();
+    const baslangicYukle = async () => {
+      let vData = null;
+
+      // 1. Durum: Postlar panelinden tıklanan aktif video yerel hafızada var mı? (0ms gecikme, kesin veri)
+      const savedActiveVideo = localStorage.getItem("mevzu_active_video");
+      if (savedActiveVideo) {
+        try {
+          vData = JSON.parse(savedActiveVideo);
+          localStorage.removeItem("mevzu_active_video"); // Tüketildi
+        } catch (e) {
+          console.warn("Aktif video okunamadı:", e);
+        }
+      }
+
+      // 2. Durum: Yerelde yoksa ama URL'de video ID varsa Firestore'dan çek (Örn: F5 ile yenileme)
+      if (!vData) {
+        const pathId = window.location.pathname.replace(/^\/+/, "");
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetVideoId = pathId || urlParams.get("id");
+
+        if (targetVideoId && (targetVideoId.startsWith("reel_") || targetVideoId.startsWith("2026"))) {
+          try {
+            setYukleniyor(true);
+            const vSnap = await getDoc(doc(db, "videos", targetVideoId));
+            if (vSnap.exists()) {
+              vData = { id: targetVideoId, videoId: targetVideoId, ...vSnap.data() };
+            }
+          } catch (err) {
+            console.warn("Firestore video verisi çekilemedi:", err.message);
+          } finally {
+            setYukleniyor(false);
+          }
+        }
+      }
+
+      // ── EĞER VİDEO VERİSİ BULUNDUYSA: BİREBİR VE EKSİKSİZ YÜKLE ──
+      if (vData) {
+        const vQuote = (vData.quote || "").replace(/\r?\n+/g, " ").trim();
+        const vAuthor = vData.author || "Mevzu";
+        const vCat = (vData.category || "FELSEFE").toUpperCase();
+        const vBg = vData.bgStyle || vData.bgId || "ocean";
+        const preset = NATURE_PRESETS[vBg] || NATURE_PRESETS.ocean;
+        const vHighlight = vData.highlightColor || preset.contrastAccent || preset.accent || "#f5c542";
+        const vFont = vData.fontFamily || "'DM Sans', sans-serif";
+        const vAnim = vData.animStyle || "highlight";
+        const vId = vData.videoId || vData.id || generateVideoId();
+        const vMusicUrl = vData.musicUrl || MUSIC_PRESETS[0].url;
+        const vMusicId = vData.musicId || MUSIC_PRESETS[0].id;
+
+        // Metin ve Kimlik
+        setQuote(vQuote);
+        setAuthor(vAuthor);
+        setCategory(vCat);
+        setVideoId(vId);
+        setVideoFileName(vId);
+
+        // Tema ve Görsel
+        setBgStyle(vBg);
+        setSelectedCat(preset.cat || "Doğa & Su");
+        setHighlightColor(vHighlight);
+        setFontFamily(vFont);
+        setAnimStyle(vAnim);
+
+        // Müzik ve İsmi (Mixkit / Presets eşleştirmesi)
+        setMusicUrl(vMusicUrl);
+        setMusicId(vMusicId);
+        const matchedMusic = VERIFIED_MIXKIT_TRACKS.find((t) => t.url === vMusicUrl || t.id === vMusicId)
+          || MUSIC_PRESETS.find((t) => t.url === vMusicUrl || t.id === vMusicId);
+        setMusicName(matchedMusic ? matchedMusic.name : vData.musicName || "🎵 Kayıtlı Reels Müziği");
+
+        // Açıklama
+        if (vData.caption) {
+          setCaption(vData.caption);
+        } else {
+          yenidenCaptionUret(vQuote, vAuthor, vCat);
+        }
+
+        guncelleUrl(vId);
+        return; // HEDEF VİDEO EKSİKSİZ YÜKLENDİ, ASLA RASTGELE SEÇME!
+      }
+
+      // 3. Durum: Postlar panelinden seçilen aktif bir söz var mı?
+      const savedActiveQuote = localStorage.getItem("mevzu_active_quote");
+      if (savedActiveQuote) {
+        try {
+          const q = JSON.parse(savedActiveQuote);
+          localStorage.removeItem("mevzu_active_quote"); // Bir kere tüket
+          if (q && q.quote) {
+            setQuote(q.quote);
+            if (q.author) setAuthor(q.author);
+            if (q.cat) setCategory(q.cat.toUpperCase());
+            setCurrentQuoteObj(q);
+            yenidenCaptionUret(q.quote, q.author || "Mevzu", (q.cat || "FELSEFE").toUpperCase());
+            return; // SEÇİLEN SÖZ YÜKLENDİ, RASTGELE SÖZ ÇEKME!
+          }
+        } catch (e) {
+          console.warn("Aktif söz okunamadı:", e);
+        }
+      }
+
+      // 4. Durum: Hiçbir özel video/söz seçilmemişse rastgele uyumlu kombinasyon üret
+      sihirliUyumluOlustur();
+    };
+
+    baslangicYukle();
   }, []);
 
   const cleanName = videoFileName.trim() || `mevzu_${Date.now()}`;

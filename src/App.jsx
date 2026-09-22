@@ -12,7 +12,30 @@ export default function App() {
   const [girisYapildi, setGirisYapildi] = useState(
     () => localStorage.getItem("mevzu_auth") === "1"
   );
-  const [page, setPage] = useState("home");
+  
+  // URL'de doğrudan video linki varsa (örn: /reel_2026...) doğrudan stüdyoyu aç
+  const [page, setPage] = useState(() => {
+    const p = window.location.pathname.replace(/^\/+/, "");
+    if (p.startsWith("reel_") || p.startsWith("2026")) {
+      return "remotion";
+    }
+    return "home";
+  });
+  
+  const [previousPage, setPreviousPage] = useState("home");
+
+  const navigateTo = (targetPage) => {
+    setPreviousPage(page);
+    setPage(targetPage);
+  };
+
+  const goBackFromRemotion = () => {
+    try {
+      window.history.replaceState({}, "", "/");
+    } catch (e) {}
+    setPage(previousPage || "home");
+  };
+
   const [tema, setTema] = useState(
     () => localStorage.getItem("mevzu_tema") || "dark"
   );
@@ -40,13 +63,13 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", WebkitTapHighlightColor: "transparent" }}>
-      {page === "home"    && <HomePage    tema={tema} onToggleTema={toggleTema} onOpen={setPage} onCikis={handleCikis} />}
+      {page === "home"    && <HomePage    tema={tema} onToggleTema={toggleTema} onOpen={navigateTo} onCikis={handleCikis} />}
       {page === "square"  && <EditorPage  tema={tema} onBack={() => setPage("home")} />}
       {page === "reels"    && <ReelsPage          tema={tema} onBack={() => setPage("home")} />}
-      {page === "remotion" && <RemotionStudioPage tema={tema} onBack={() => setPage("home")} />}
+      {page === "remotion" && <RemotionStudioPage tema={tema} onBack={goBackFromRemotion} />}
       {page === "surpriz"  && <SurprizPage        tema={tema} onBack={() => setPage("home")} />}
       {page === "profil"  && <ProfilePage tema={tema} onBack={() => setPage("home")} />}
-      {page === "postlar" && <PostlarPage tema={tema} onBack={() => setPage("home")} />}
+      {page === "postlar" && <PostlarPage tema={tema} onBack={() => setPage("home")} onOpen={navigateTo} />}
     </div>
   );
 }

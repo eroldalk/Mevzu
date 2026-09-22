@@ -102,3 +102,21 @@ Bu belge, **Mevzu** projesinin tamamlanan özelliklerini, çalışan otonom mima
 * **Uygulama:**
   - Tarayıcıya `localhost:5174/reel_[videoId]` yazıldığında veya sitedeki arama kutusuna ID/yazar/kelime girildiğinde;
   - Firestore'daki `videos` deposundan o videonun tüm reçetesi çekilecek ve stüdyoda birebir canlı oynatılacak.
+
+---
+
+## 📊 Mevzu İçerik & Medya Paneli (Postlarım CRUD - TAMAMLANDI ✅)
+
+> 📌 **AMAÇ:** `HomePage.jsx` sol menüsündeki "Postlarım" sayfasını, Firebase `mevzuv1` veritabanını tam yetkiyle (CRUD) yöneten profesyonel bir içerik ve medya merkezine dönüştürmek.
+
+1. **Canlı İstatistik Bandı:**
+   - Sayfa başında canlı: `{totalQuotes} SÖZ · {usedQuotes} KULLANILDI · {unusedQuotes} HAZIR · {totalVideos} VİDEO`.
+2. **3'lü Modüler Sekme Yapısı:**
+   - **`[ 🎬 Atılan Videolar ]`**: Firestore `videos` koleksiyonu, yayınlandı rozeti, söz & yazar bilgisi, `[ Stüdyoda Aç ]` ve `[ Sil ]` aksiyonları.
+   - **`[ 📚 Söz Havuzu ]`**: Firestore `quotes` koleksiyonu, canlı kelime & yazar araması, kategori filtresi, `[ Kullanılmamış / Kullanılmış ]` filtre hapları, `[ Bu Sözle Reels Yap ]` ve `[ Sil ]` aksiyonları.
+   - **`[ 🖼️ İndirilen Görseller ]`**: Var olan yerel kart indirme arşivi korundu.
+3. **Çift Yönlü İlişki (`quoteId` ↔ `videoId`):**
+   - Videonun hangi sözden üretildiği, sözün hangi videoda kullanıldığı karşılıklı etiketlerle tıklandığında anında gösterilir.
+4. **Site Üzerinden CRUD (Ekle/Sil/Durum Değiştir):**
+   - Modal penceresi üzerinden tek tıkla yeni söz ekleme (`addDoc`), söz durumunu sıraya geri alma/kullanıldı yapma (`updateDoc`) ve kalıcı silme (`deleteDoc`).
+

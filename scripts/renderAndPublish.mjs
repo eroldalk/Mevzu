@@ -556,6 +556,11 @@ async function main() {
       } catch (err) {
         console.warn("⚠️ Veritabanı mühürleme güncellenirken uyarı:", err.message);
       }
+    } else {
+      // Instagram'a gönderilmediyse (örn: lokal test) slot kilidini boşuna bloke etme, serbest bırak!
+      if (activeSlotInfo && currentSlotId !== "MANUAL") {
+        await releaseSlotLockOnFailure(currentDateStr, currentSlotId, "Lokal çalıştırma (Instagram tokenı yok)");
+      }
     }
 
     console.log("==========================================");

@@ -213,8 +213,36 @@ export async function downloadInstagramCover({
   ctx.fillText(catText, width / 2, badgeY + 18);
   ctx.restore();
 
-  // 7. JPEG Olarak İndir
+  // 7. JPEG Olarak İndir & Yerel Galeriye (mevzu_postlar) Kaydet
   const finalFileName = `${fileName}_cover_${aspectRatio.replace(":", "x")}.jpg`;
+
+  try {
+    const thumb = document.createElement("canvas");
+    const thumbW = 360;
+    const thumbH = aspectRatio === "1:1" ? 360 : 640;
+    thumb.width = thumbW;
+    thumb.height = thumbH;
+    const tCtx = thumb.getContext("2d");
+    tCtx.drawImage(canvas, 0, 0, thumbW, thumbH);
+    const thumbData = thumb.toDataURL("image/jpeg", 0.78);
+
+    const mevcutlar = JSON.parse(localStorage.getItem("mevzu_postlar") || "[]");
+    const yeniPost = {
+      id: Date.now(),
+      img: thumbData,
+      date: new Date().toISOString(),
+      aspectRatio,
+      quote: cleanQuote,
+      author: author || "Mevzu",
+      category: catText,
+      type: "cover",
+    };
+    const guncel = [yeniPost, ...mevcutlar].slice(0, 40);
+    localStorage.setItem("mevzu_postlar", JSON.stringify(guncel));
+  } catch (saveErr) {
+    console.warn("Kapak yerel hafızaya kaydedilemedi:", saveErr);
+  }
+
   canvas.toBlob(
     (blob) => {
       if (!blob) return;
