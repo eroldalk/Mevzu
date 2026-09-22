@@ -272,7 +272,7 @@ export default function SozHavuzuBattery({
             SÖZ HAVUZU ŞARJI
           </span>
           <span style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>
-            ({unusedCount} sıradaki · {usedCount} paylaşıldı · {totalCount} toplam)
+            ({unusedCount} Hazır Söz)
           </span>
         </div>
 

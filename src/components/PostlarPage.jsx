@@ -151,12 +151,11 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
     return { totalQuotes: totalQ, usedQuotes: usedQ, unusedQuotes: unusedQ, totalVideos: totalV };
   }, [allQuotes, videos]);
 
-  // 3. FİLTRELENMİŞ SÖZLER
+  // 3. FİLTRELENMİŞ SÖZLER (Kullanılan sözler söz havuzundan tamamen çıkarılır!)
   const filteredQuotes = useMemo(() => {
     return allQuotes.filter((q) => {
-      // Durum Filtresi
-      if (quoteFilter === "unused" && q.used) return false;
-      if (quoteFilter === "used" && !q.used) return false;
+      // KULLANILAN SÖZLERİ SÖZ HAVUZUNDAN ÇIKAR
+      if (q.used) return false;
 
       // Kategori Filtresi
       if (selectedKategori !== "all" && q.cat !== selectedKategori) return false;
@@ -169,7 +168,7 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
       }
       return true;
     });
-  }, [allQuotes, quoteFilter, selectedKategori, quoteSearch]);
+  }, [allQuotes, selectedKategori, quoteSearch]);
 
   // Sözler Sayfalama
   const totalQuotePages = Math.max(1, Math.ceil(filteredQuotes.length / quotePageSize));
@@ -426,13 +425,9 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                 gap: 8,
               }}
             >
-              <span style={{ color: "#38bdf8" }}>{stats.totalQuotes} SÖZ</span>
+              <span style={{ color: "#f5c542" }}>{stats.unusedQuotes} HAZIR SÖZ</span>
               <span style={{ color: "#475569" }}>·</span>
-              <span style={{ color: "#10b981" }}>{stats.usedQuotes} KULLANILDI</span>
-              <span style={{ color: "#475569" }}>·</span>
-              <span style={{ color: "#f5c542" }}>{stats.unusedQuotes} HAZIR</span>
-              <span style={{ color: "#475569" }}>·</span>
-              <span style={{ color: "#f472b6" }}>{stats.totalVideos} VİDEO</span>
+              <span style={{ color: "#f472b6" }}>{stats.totalVideos} YAYINLANAN VİDEO</span>
             </div>
 
             <button
@@ -630,30 +625,23 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
                   ))}
                 </select>
 
-                {/* Durum Hapları: Sıradakiler (Hazır) / Kullanılanlar / Tümü */}
-                <div style={{ display: "flex", background: "rgba(0,0,0,0.4)", borderRadius: 10, padding: 3 }}>
-                  {[
-                    { id: "unused", label: `⏳ Sıradakiler (${stats.unusedQuotes})` },
-                    { id: "used", label: `✅ Kullanılanlar (${stats.usedQuotes})` },
-                    { id: "all", label: `Tümü (${stats.totalQuotes})` },
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => setQuoteFilter(f.id)}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 8,
-                        border: "none",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        background: quoteFilter === f.id ? "rgba(255,255,255,0.14)" : "transparent",
-                        color: quoteFilter === f.id ? "#ffffff" : "#94a3b8",
-                      }}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+                {/* Havuz Durumu Rozeti: Sadece Sıradaki Sözler */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "rgba(201, 168, 76, 0.12)",
+                    border: `1px solid rgba(201, 168, 76, 0.3)`,
+                    padding: "7px 14px",
+                    borderRadius: 9,
+                    color: T.gold || "#c9a84c",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>⏳</span>
+                  <span>Sıradakiler: {stats.unusedQuotes} Söz</span>
                 </div>
 
                 {/* ➕ Yeni Söz Ekle Butonu */}
