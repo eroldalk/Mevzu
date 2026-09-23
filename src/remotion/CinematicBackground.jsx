@@ -104,7 +104,7 @@ export const CinematicBackground = ({
         style={{
           position: "absolute",
           inset: 0,
-          background: `linear-gradient(180deg, rgba(0,0,0,0.68) 0%, ${preset.overlay || "rgba(0,0,0,0.48)"} 45%, rgba(0,0,0,0.78) 100%)`,
+          background: `linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.58) 45%, rgba(0,0,0,0.85) 100%)`,
         }}
       />
 

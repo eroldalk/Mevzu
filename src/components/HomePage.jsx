@@ -1,4 +1,4 @@
-import { Globe, Smartphone, Shuffle, Video, Images, LogOut, Sun, Moon } from "lucide-react";
+import { Globe, Smartphone, Shuffle, Video, Images, LogOut, Sun, Moon, Settings } from "lucide-react";
 import { TEMALAR } from "../utils/tema";
 import { useIsDesktop } from "../utils/hooks";
 import SozHavuzuBattery from "./SozHavuzuBattery";
@@ -78,6 +78,9 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
 
           {/* Butonlar */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+            {sideBtn(() => onOpen("ayarlar"),
+              <><Settings size={14} color={T.gold} /><span style={{ color: T.gold, fontWeight: 600 }}>Otomasyon Ayarları</span></>
+            )}
             {sideBtn(onToggleTema,
               <>{tema === "dark" ? <Sun size={14} color={T.muted} /> : <Moon size={14} color={T.muted} />}
               <span>{tema === "dark" ? "Açık Tema" : "Koyu Tema"}</span></>
@@ -169,43 +172,40 @@ export default function HomePage({ tema, onToggleTema, onOpen, onCikis }) {
       position: "relative",
     }}>
 
-      {/* Mobil Sol Üst Navbar: Söz Havuzu Şarjı */}
-      <div style={{ position: "absolute", top: 14, left: 14 }}>
+      {/* Mobil Üst Bar (Çakışmasız, Dengeli Flex Navbar) */}
+      <div style={{
+        position: "absolute", top: 12, left: 0, width: "100%",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 14px", boxSizing: "border-box", zIndex: 50
+      }}>
+        {/* Sol: Söz Havuzu Şarjı */}
         <SozHavuzuBattery compact={true} onClick={() => onOpen("postlar")} />
-      </div>
 
-      <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{goruntu}</span>
-          {isim && <span style={{ fontSize: 9, color: T.faint, letterSpacing: 1 }}>@{kullanici}</span>}
+        {/* Sağ: İkonlar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={() => onOpen("ayarlar")} style={iconBtn} title="Otomasyon Ayarları">
+            <Settings size={15} color={T.gold} />
+          </button>
+          <button onClick={onToggleTema} style={iconBtn} title="Tema Değiştir">
+            {tema === "dark" ? <Sun size={15} color={T.muted} /> : <Moon size={15} color={T.muted} />}
+          </button>
+          <button onClick={() => onOpen("postlar")} style={iconBtn} title="Postlarım">
+            <Images size={15} color={T.muted} />
+          </button>
+          <div
+            onClick={() => onOpen("profil")}
+            title="Profil"
+            style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: `2px solid ${T.gold}`, background: `rgba(${T.gr},.12)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
+            {foto
+              ? <img src={foto} alt="profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <span style={{ fontSize: 14, fontWeight: 700, color: T.gold }}>{kullanici.charAt(0).toUpperCase()}</span>
+            }
+          </div>
+          <button onClick={onCikis} style={iconBtn} title="Çıkış Yap">
+            <LogOut size={14} color={T.faint} />
+          </button>
         </div>
-        <div
-          onClick={() => onOpen("profil")}
-          style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", cursor: "pointer", border: `2px solid ${T.gold}`, background: `rgba(${T.gr},.12)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-        >
-          {foto
-            ? <img src={foto} alt="profil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            : <span style={{ fontSize: 16, fontWeight: 700, color: T.gold }}>{kullanici.charAt(0).toUpperCase()}</span>
-          }
-        </div>
-        <button onClick={onToggleTema} style={iconBtn}
-          onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
-          onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
-        >
-          {tema === "dark" ? <Sun size={16} color={T.muted} /> : <Moon size={16} color={T.muted} />}
-        </button>
-        <button onClick={() => onOpen("postlar")} style={iconBtn}
-          onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
-          onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
-        >
-          <Images size={16} color={T.muted} />
-        </button>
-        <button onClick={onCikis} style={iconBtn}
-          onMouseEnter={e => e.currentTarget.style.borderColor = "#e07070"}
-          onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
-        >
-          <LogOut size={15} color={T.faint} />
-        </button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>

@@ -1,15 +1,12 @@
 name: 🚀 Mevzu Günlük Reels Otomasyonu
 
 on:
-  # Günde 2 Kez Otomatik Çalışma (Türkiye Saati: UTC+3)
-  # 06:00 UTC = 09:00 Türkiye Saati (Sabah Gönderisi)
-  # 17:00 UTC = 20:00 Türkiye Saati (Akşam Gönderisi)
+  # Dinamik Otomasyon Nöbetçisi (Türkiye Saati: UTC+3)
+  # Siteden kaydettiğiniz saatleri (Reels ve 08:00 Sabah Hikayesi) otomatik yakalar.
+  # Gece Asla Çalışmaz! Yalnızca 08:00 - 23:00 Türkiye saatleri arasında uyanır (05:00 - 20:00 UTC).
+  # Belirlediğiniz saat gelmediyse veya gönderi zaten atıldıysa 2 saniyede kendini kapatır.
   schedule:
-    # --- KESİNTİSİZ NÖBETÇİ CRON (Her 15 Dakikada Bir Uyanır) ---
-    # :00, :15, :30, :45 dakikalarında kontrol eder.
-    # Hedef slot saatleri (08:30, 11:00, 13:30, 16:30, 19:30, 22:00) tam :00 ve :30 dakikalarındadır.
-    # Böylece her slot tam vaktinde tetiklenir ve asla erken yayın yapmaz.
-    - cron: '0,15,30,45 * * * *'
+    - cron: '0,30 5-20 * * *'
 
   # GitHub Paneli Üzerinden "Run Workflow" Butonuyla İstenildiği An Manuel Tetikleme
   workflow_dispatch:

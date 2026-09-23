@@ -528,18 +528,17 @@ export default function PostlarPage({ tema = "dark", onBack, onOpen }) {
             İndirilen Görseller ({localPostlar.length})
           </button>
         </div>
+      </div>
 
-        {/* ── SÖZ HAVUZU DİNAMİK ŞARJ ÇUBUĞU (KAPASİTE BİLGİSİ) ── */}
-        <div style={{ maxWidth: 1300, margin: "0 auto" }}>
+      {/* ── İÇERİK ALANI ── */}
+      <div style={{ maxWidth: 1300, margin: "20px auto", padding: "0 20px" }}>
+        {/* ── SÖZ HAVUZU DİNAMİK ŞARJ ÇUBUĞU (KAPASİTE BİLGİSİ - SCROLL EDİLEBİLİR) ── */}
+        <div style={{ marginBottom: 20 }}>
           <SozHavuzuBattery
             unused={stats.unusedQuotes}
             total={stats.totalQuotes}
           />
         </div>
-      </div>
-
-      {/* ── İÇERİK ALANI ── */}
-      <div style={{ maxWidth: 1300, margin: "24px auto", padding: "0 20px" }}>
         {/* ════════════════════════════════════════════════════════════
             1. SEKME: SÖZ HAVUZU (TABLO + 25'Lİ SAYFALAMA)
         ════════════════════════════════════════════════════════════ */}

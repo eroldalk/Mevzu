@@ -41,15 +41,28 @@ function generateVideoId() {
 }
 
 // ─── Akıllı Yayın Slotları & Gecikme Takip Motoru ──────────────────────────
-// Günlük 6 Altın Yayın Saati (Türkiye Saati: UTC+3)
-const DAILY_SLOTS = [
-  { id: "08:30", hour: 8,  minute: 30, name: "Sabah Kahvesi" },
-  { id: "11:00", hour: 11, minute: 0,  name: "İş Öncesi Motivasyon" },
-  { id: "13:30", hour: 13, minute: 30, name: "Öğle Molası" },
-  { id: "16:30", hour: 16, minute: 30, name: "İkindi Molası" },
-  { id: "19:30", hour: 19, minute: 30, name: "Akşam Dönüşü" },
-  { id: "22:00", hour: 22, minute: 0,  name: "Gece Derin Düşünce" },
-];
+// ─── Akıllı Yayın Slotları & Dinamik Ayar Motoru ──────────────────────────
+async function getDynamicSlots() {
+  try {
+    const docRef = doc(db, "settings", "schedule");
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.slots) && data.slots.length > 0) {
+        console.log(`⚙️  Firestore'dan dinamik yayın saatleri okundu: [${data.slots.join(", ")}]`);
+        return data.slots.map((s) => {
+          const [hStr, mStr] = s.split(":");
+          const hour = parseInt(hStr, 10);
+          const minute = parseInt(mStr || "0", 10);
+          return { id: s, hour, minute, name: `Planlanan Yayın (${s})` };
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ Dinamik ayarlar okunurken uyarı (varsayılana dönülüyor):", err.message);
+  }
+  return [{ id: "19:00", hour: 19, minute: 0, name: "Akşam Ana Yayını (19:00)" }];
+}
 
 // Türkiye yerel saatini hesapla (UTC+3)
 function getTurkeyNow() {
@@ -156,26 +169,22 @@ async function determineActiveSlot() {
   const timeFormatted = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   console.log(`🕒 Türkiye Saati: ${timeFormatted} (Tarih: ${dateStr})`);
 
-  // Günün ilk yayın saati (08:30) gelmediyse kesinlikle bekle
-  const firstSlotMinutes = DAILY_SLOTS[0].hour * 60 + DAILY_SLOTS[0].minute;
-  if (currentMinutes < firstSlotMinutes) {
-    console.log(`ℹ️  Günün ilk yayın saati (${DAILY_SLOTS[0].id}) henüz gelmedi. Bekleniyor.`);
-    return null;
-  }
+  const activeSlots = await getDynamicSlots();
 
   // Şu anki zamana denk gelen veya zamanı geçmiş aktif slotu tespit et (ASLA ERKEN YAYIN YOK!)
   let candidateSlot = null;
-  for (let i = DAILY_SLOTS.length - 1; i >= 0; i--) {
-    const s = DAILY_SLOTS[i];
+  for (let i = activeSlots.length - 1; i >= 0; i--) {
+    const s = activeSlots[i];
     const sMinutes = s.hour * 60 + s.minute;
-    if (currentMinutes >= sMinutes) {
+    // 3 dakika erken tetiklenme toleransı
+    if (process.env.FORCE_PUBLISH === "true" || currentMinutes + 3 >= sMinutes) {
       candidateSlot = s;
       break;
     }
   }
 
   if (!candidateSlot) {
-    console.log("ℹ️  Aktif slot bulunamadı.");
+    console.log(`ℹ️  Günün ilk yayın saati (${activeSlots[0].id}) henüz gelmedi. Bekleniyor.`);
     return null;
   }
 
@@ -249,22 +258,67 @@ function getMusicForCategory(categoryStr = "") {
 async function fetchUnusedQuote() {
   console.log("🔍 Firestore'dan kullanılmamış söz aranıyor...");
   const quotesRef = collection(db, "quotes");
-  const q = query(quotesRef, where("used", "!=", true), limit(10));
-  const snapshot = await getDocs(q);
+  const videosRef = collection(db, "videos");
 
-  let selectedDoc = null;
-  if (!snapshot.empty) {
-    const docs = snapshot.docs;
-    selectedDoc = docs[Math.floor(Math.random() * docs.length)];
-  } else {
-    console.log("ℹ️  Kullanılmamış söz kalmadı, genel havuzdan seçiliyor...");
-    const allSnapshot = await getDocs(query(quotesRef, limit(20)));
-    if (!allSnapshot.empty) {
-      selectedDoc = allSnapshot.docs[Math.floor(Math.random() * allSnapshot.docs.length)];
+  // Kullanıcının sitedeki tercihlerini oku (Kısa söz önceliği)
+  let shortQuotesOnly = true;
+  try {
+    const snap = await getDoc(doc(db, "settings", "schedule"));
+    if (snap.exists() && snap.data().shortQuotesOnly !== undefined) {
+      shortQuotesOnly = snap.data().shortQuotesOnly;
+    }
+  } catch (e) {}
+
+  // Geçmişte yayınlanmış tüm videoların sözlerini topla (çifte garanti!)
+  const publishedQuoteTexts = new Set();
+  try {
+    const publishedVideosSnap = await getDocs(query(videosRef, where("published", "==", true)));
+    publishedVideosSnap.forEach((vDoc) => {
+      const vd = vDoc.data();
+      if (vd.quote) {
+        publishedQuoteTexts.add(vd.quote.replace(/\s+/g, " ").trim().toLowerCase());
+      }
+    });
+  } catch (err) {
+    console.warn("⚠️ Yayınlanmış videolar taranırken uyarı:", err.message);
+  }
+
+  const snapshot = await getDocs(quotesRef);
+  const unusedDocs = [];
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    if (data.used === true) return;
+    const cleanQuote = (data.quote || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (publishedQuoteTexts.has(cleanQuote)) return; // Daha önce videoda yayınlanmışsa atla!
+    unusedDocs.push(docSnap);
+  });
+
+  console.log(`📊 Havuz Durumu: Toplam ${snapshot.size} sözden ${unusedDocs.length} tanesi henüz hiç kullanılmadı.`);
+
+  // Kısa ve vurucu sözler önceliği (3 - 12 kelime arası, dev puntolu, yüksek izlenme)
+  let candidateDocs = unusedDocs;
+  if (shortQuotesOnly) {
+    const shortDocs = unusedDocs.filter((d) => {
+      const text = (d.data().quote || "").trim();
+      const words = text.split(/\s+/).filter(Boolean);
+      return words.length >= 3 && words.length <= 12;
+    });
+    if (shortDocs.length > 0) {
+      console.log(`✨ Kısa ve Vurucu Söz Filtresi devrede: ${shortDocs.length} adet kısa söz bulundu.`);
+      candidateDocs = shortDocs;
     }
   }
 
+  let selectedDoc = null;
+  if (candidateDocs.length > 0) {
+    selectedDoc = candidateDocs[Math.floor(Math.random() * candidateDocs.length)];
+  } else if (unusedDocs.length > 0) {
+    selectedDoc = unusedDocs[Math.floor(Math.random() * unusedDocs.length)];
+  }
+
   if (!selectedDoc) {
+    console.warn("⚠️ Havuzda kullanılmamış söz kalmadı!");
     return {
       id: null,
       quote: "Gerçek asla yüzeyde bulunmaz. O, derinlere inmenin bir sonucudur.",
@@ -274,11 +328,12 @@ async function fetchUnusedQuote() {
   }
 
   const data = selectedDoc.data();
-  console.log(`📖 Söz seçildi (henüz harcanmadı): ID [${selectedDoc.id}]`);
+  const wordCount = (data.quote || "").trim().split(/\s+/).length;
+  console.log(`📖 Söz seçildi (henüz harcanmadı): ID [${selectedDoc.id}] - "${data.quote}" (${wordCount} kelime)`);
 
   return {
     id: selectedDoc.id,
-    quote: data.quote,
+    quote: data.quote.replace(/\r?\n|\r/g, " ").trim(),
     author: data.author || "Mevzu",
     cat: data.cat ? data.cat.toUpperCase() : "FELSEFE",
   };
@@ -410,9 +465,19 @@ async function main() {
   console.log("🚀 #MEVZU OTONOM YAYIN MOTORU BAŞLATILDI");
   console.log("==========================================");
 
+  // 0.0 Telefondan gelen manuel yayın talebi var mı kontrol et
+  let manualReqDoc = null;
+  try {
+    const pendingSnap = await getDoc(doc(db, "manual_publish_queue", "pending"));
+    if (pendingSnap.exists() && pendingSnap.data().status === "pending") {
+      manualReqDoc = pendingSnap.data();
+      console.log(`📲 [MANUEL TALEP TESPİT EDİLDİ] Telefondan talep edilen video yayınlanacak: "${manualReqDoc.quote}"`);
+    }
+  } catch (e) {}
+
   // 0. Akıllı Slot & Zaman Kontrolü
-  // Eğer FORCE_PUBLISH ortam değişkeni verilmişse kontrolü atlar (manuel test modu)
-  const isForce = process.env.FORCE_PUBLISH === "true";
+  // Eğer FORCE_PUBLISH veya manuel talep varsa slot kontrolünü atlar
+  const isForce = process.env.FORCE_PUBLISH === "true" || !!manualReqDoc;
   let activeSlotInfo = null;
 
   if (!isForce) {
@@ -423,17 +488,17 @@ async function main() {
       return;
     }
   } else {
-    console.log("⚡ [MANUEL ZORLAMA MODU]: Slot kontrolü atlanıyor, direkt yayın yapılacak!");
+    console.log("⚡ [MANUEL ZORLAMA / TELEFON MODU]: Slot kontrolü atlanıyor, direkt yayın yapılacak!");
   }
 
-  const currentSlotId = activeSlotInfo ? activeSlotInfo.slot.id : "MANUAL";
-  const currentSlotName = activeSlotInfo ? activeSlotInfo.slot.name : "Manuel Tetikleme";
+  const currentSlotId = manualReqDoc ? "MOBILE_MANUAL" : (activeSlotInfo ? activeSlotInfo.slot.id : "MANUAL");
+  const currentSlotName = manualReqDoc ? "Telefondan Manuel İstek" : (activeSlotInfo ? activeSlotInfo.slot.name : "Manuel Tetikleme");
   const currentDateStr = activeSlotInfo ? activeSlotInfo.dateStr : getTurkeyNow().dateStr;
 
   console.log(`🎯 Hedef Slot: [${currentSlotId}] — ${currentSlotName}`);
 
-  // 0.1 Atomik Slot Kilidini Al (Eğer manuel değilse)
-  if (activeSlotInfo && currentSlotId !== "MANUAL") {
+  // 0.1 Atomik Slot Kilidini Al (Eğer otomatik slot ise)
+  if (activeSlotInfo && currentSlotId !== "MANUAL" && currentSlotId !== "MOBILE_MANUAL") {
     console.log(`🔒 [KİLİT KONTROLÜ] slot_locks/${currentDateStr}_${currentSlotId.replace(":", "")} kilidi isteniyor...`);
     const lockResult = await acquireSlotLock(currentDateStr, currentSlotId);
     if (!lockResult.acquired) {
@@ -446,7 +511,7 @@ async function main() {
   // Kritik işlem bloğu: Hata durumunda kilidi serbest bırakır ve bildirim verir
   try {
     // Doğal Algoritma Jitter'ı (5-20 saniye mikro bekleme)
-    if (activeSlotInfo) {
+    if (activeSlotInfo && !manualReqDoc) {
       await applyHumanJitter();
     }
 
@@ -454,13 +519,26 @@ async function main() {
     const videoId = generateVideoId();
     console.log(`🆔 Video ID: ${videoId}`);
 
-    // 2. Sözü çek (SADECE OKUR, henüz harcamaz!)
-    const quoteData = await fetchUnusedQuote(currentSlotId, currentDateStr);
-    console.log(`📖 Söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
+    // 2. Sözü belirle (Telefondan geldiyse o sözü kullan, yoksa havuzdan çek)
+    let quoteData = null;
+    if (manualReqDoc) {
+      quoteData = {
+        id: manualReqDoc.quoteId || null,
+        quote: manualReqDoc.quote,
+        author: manualReqDoc.author || "Mevzu",
+        cat: (manualReqDoc.category || "FELSEFE").toUpperCase(),
+      };
+      console.log(`📲 Telefondan seçilen söz: "${quoteData.quote}" — ${quoteData.author}`);
+    } else {
+      quoteData = await fetchUnusedQuote(currentSlotId, currentDateStr);
+      console.log(`📖 Havuzdan seçilen söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
+    }
 
     // 3. Pixabay'den kategoriye uygun müzik seç
     console.log("🎵 Müzik seçiliyor...");
-    const musicData = await getMusicForCategory(quoteData.cat);
+    const musicData = manualReqDoc?.musicUrl 
+      ? { musicId: "custom_mobile", musicUrl: manualReqDoc.musicUrl, source: "mobile" }
+      : await getMusicForCategory(quoteData.cat);
     console.log(`🎵 Seçilen: ${musicData.musicId} (${musicData.source}) → ${musicData.musicUrl}`);
 
     // 4. Açıklamayı Gemini AI ile üret (Kategori parantezi olmadan temiz)
@@ -550,8 +628,21 @@ async function main() {
         await markQuoteAsUsed(quoteData.id, currentSlotId, currentDateStr, videoId);
 
         // 3. Atomik slot kilidini 'published' olarak mühürle
-        if (currentSlotId !== "MANUAL") {
+        if (currentSlotId !== "MANUAL" && currentSlotId !== "MOBILE_MANUAL") {
           await finalizeSlotLockSuccess(currentDateStr, currentSlotId, videoId, instagramPostId);
+        }
+
+        // 4. Eğer telefondan gelen manuel talep ise onu da 'completed' yap
+        if (manualReqDoc) {
+          try {
+            await setDoc(doc(db, "manual_publish_queue", "pending"), {
+              status: "completed",
+              completedAt: new Date().toISOString(),
+              videoId,
+              instagramId: instagramPostId,
+            }, { merge: true });
+            console.log("✅ [MANUEL YAYIN] manual_publish_queue/pending 'completed' olarak mühürlendi.");
+          } catch (e) {}
         }
       } catch (err) {
         console.warn("⚠️ Veritabanı mühürleme güncellenirken uyarı:", err.message);

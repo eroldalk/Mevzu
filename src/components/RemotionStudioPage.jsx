@@ -492,33 +492,71 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
       setPublishError("");
       setPublishedSuccess(false);
       setPublishedPostId("");
-      setPublishStep("🎬 Video 1080×1920 MP4 olarak renderlanıyor...");
+      setPublishStep("🎬 Yayın talebi hazırlanıyor...");
 
-      // 1. Backend /api/manual-publish endpoint'ine gönder
-      const res = await fetch("/api/manual-publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let isPublishedViaLocalServer = false;
+
+      // 1. Yerel sunucu varsa (/api/manual-publish) dene
+      try {
+        const res = await fetch("/api/manual-publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quote,
+            author,
+            category,
+            bgStyle,
+            musicUrl,
+            primaryColor: highlightColor,
+            highlightColor,
+            animStyle,
+            fontFamily,
+            caption,
+            quoteId: currentQuoteObj?.id || null,
+          }),
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+        if (res.ok && contentType.includes("application/json")) {
+          const result = await res.json();
+          if (result && result.success) {
+            isPublishedViaLocalServer = true;
+            setPublishedPostId(result.instagramId);
+            setPublishedSuccess(true);
+            setPublishStep("🎉 Instagram'da Canlı Yayında!");
+          }
+        }
+      } catch (localErr) {
+        // Yerel sunucu yoksa telefondan bulut kuyruğuna geç
+      }
+
+      // 2. Eğer telefonda (GitHub Pages statik ortamında) ise bulut kuyruğuna ekle
+      if (!isPublishedViaLocalServer) {
+        setPublishStep("☁️ Bulut motoruna iletiliyor...");
+
+        const pendingRef = doc(db, "manual_publish_queue", "pending");
+        await setDoc(pendingRef, {
           quote,
           author,
           category,
           bgStyle,
-          musicUrl,
-          primaryColor: highlightColor,
-          highlightColor,
-          animStyle,
-          fontFamily,
-          caption,
+          musicUrl: musicUrl || null,
+          primaryColor: highlightColor || "#c9a84c",
+          highlightColor: highlightColor || "#c9a84c",
+          animStyle: animStyle || "viral_pop",
+          fontFamily: fontFamily || "'Montserrat', sans-serif",
+          caption: caption || "",
           quoteId: currentQuoteObj?.id || null,
-        }),
-      });
+          status: "pending",
+          requestedAt: new Date().toISOString(),
+          requestedBy: localStorage.getItem("mevzu_user") || "mobile",
+        });
 
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || "Yayınlama başarısız oldu.");
+        setPublishedSuccess(true);
+        setPublishStep("🚀 Yayın talebi başarıyla buluta iletildi! Otomasyon motoru tarafından renderlanıp Instagram'a yüklenecektir.");
       }
 
-      // 2. Sözü yerel ve Firestore'da tüketildi olarak damgala
+      // 3. Sözü yerel ve Firestore'da tüketildi olarak damgala
       if (currentQuoteObj) {
         markQuoteUsed(currentQuoteObj);
         if (currentQuoteObj.id && !currentQuoteObj.id.startsWith("local-")) {
@@ -533,7 +571,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
         }
       }
 
-      // 3. Açıklamayı panoya kopyala
+      // 4. Açıklamayı panoya kopyala
       if (caption) {
         try {
           await navigator.clipboard.writeText(caption);
@@ -541,10 +579,6 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
           setTimeout(() => setCaptionCopied(false), 4000);
         } catch (e) {}
       }
-
-      setPublishedPostId(result.instagramId);
-      setPublishedSuccess(true);
-      setPublishStep("🎉 Instagram'da Canlı Yayında!");
     } catch (err) {
       console.error("Manuel yayınlama hatası:", err);
       setPublishError(err.message || "Bilinmeyen bir hata oluştu");

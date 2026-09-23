@@ -7,6 +7,7 @@ import SurprizPage from "./components/SurprizPage";
 import RemotionStudioPage from "./components/RemotionStudioPage";
 import ProfilePage from "./components/ProfilePage";
 import PostlarPage from "./components/PostlarPage";
+import SettingsPage from "./components/SettingsPage";
 
 export default function App() {
   const [girisYapildi, setGirisYapildi] = useState(
@@ -70,6 +71,7 @@ export default function App() {
       {page === "surpriz"  && <SurprizPage        tema={tema} onBack={() => setPage("home")} />}
       {page === "profil"  && <ProfilePage tema={tema} onBack={() => setPage("home")} />}
       {page === "postlar" && <PostlarPage tema={tema} onBack={() => setPage("home")} onOpen={navigateTo} />}
+      {page === "ayarlar" && <SettingsPage tema={tema} onBack={() => setPage("home")} />}
     </div>
   );
 }
