@@ -5,7 +5,8 @@ import { NATURE_PRESETS } from "../remotion/CinematicBackground";
 import { TEMALAR } from "../utils/tema";
 import { getRandomQuote, markQuoteUsed } from "../utils/quotes";
 import { generateVideoId } from "../utils/pixabayMusic";
-import { getMixkitByCategory, VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibrary";
+import { VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibrary";
+import { createReelHarmony, getHarmonyProfile, pickHarmonyItem, HARMONY_TRACKS } from "../utils/reelHarmony";
 import { generateInstagramCaption } from "../utils/captionGenerator";
 import { db } from "../utils/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
@@ -35,44 +36,9 @@ import {
 } from "lucide-react";
 
 export const MUSIC_PRESETS = [
-  // ── 🌊 Doğa & Su ──
-  { id: "ocean_wave",      name: "🌊 Okyanus & Dalga Sesi",              url: "https://assets.mixkit.co/music/443/443.mp3", tip: "Doğa & Su" },
-  { id: "forest_birds",    name: "🌲 Orman & Kuş Sesleri",               url: "https://assets.mixkit.co/music/139/139.mp3", tip: "Doğa & Su" },
-  { id: "rain_piano",      name: "🌧️ Yağmur & Melankoli Piyano",         url: "https://assets.mixkit.co/music/522/522.mp3", tip: "Doğa & Su" },
-  { id: "nature_chill",    name: "🍃 Doğa Chillout / Huzur",             url: "https://assets.mixkit.co/music/580/580.mp3", tip: "Doğa & Su" },
-
-  // ── 🎻 Felsefe & Derin Zihin ──
-  { id: "cinematic_deep",  name: "🎻 Derin Sinematik Keşif",             url: "https://assets.mixkit.co/music/587/587.mp3", tip: "Felsefe" },
-  { id: "sad_piano",       name: "🎹 Hüzünlü Solo Piyano",               url: "https://assets.mixkit.co/music/659/659.mp3", tip: "Felsefe" },
-  { id: "stoic_strings",   name: "🏛️ Stoacı Antik Yaylılar",             url: "https://assets.mixkit.co/music/614/614.mp3", tip: "Felsefe" },
-  { id: "silent_collapse", name: "🌑 Sessiz Çöküş (Dramatik)",           url: "https://assets.mixkit.co/music/671/671.mp3", tip: "Felsefe" },
-
-  // ── 🔥 Motivasyon & Güç ──
-  { id: "fire_acoustic",   name: "🔥 Gece Ateşi & Akustik",              url: "https://assets.mixkit.co/music/127/127.mp3", tip: "Motivasyon" },
-  { id: "epic_drums",      name: "⚡ Epik Savaş Davulları",               url: "https://assets.mixkit.co/music/676/676.mp3", tip: "Motivasyon" },
-  { id: "determined",      name: "🏎️ Kararlı İlerleme (Hırs)",           url: "https://assets.mixkit.co/music/32/32.mp3",  tip: "Motivasyon" },
-  { id: "champion_rock",   name: "🏆 Şampiyon Ruhu (Rock)",              url: "https://assets.mixkit.co/music/51/51.mp3",  tip: "Motivasyon" },
-
-  // ── 🪐 Gece, Siber & Kozmik ──
-  { id: "cosmic_meditation", name: "🪐 Kozmik & Derin Meditasyon",       url: "https://assets.mixkit.co/music/134/134.mp3", tip: "Kozmik" },
-  { id: "lofi_city",       name: "🏙️ Gece Şehir Beats (Lo-Fi)",          url: "https://assets.mixkit.co/music/623/623.mp3", tip: "Kozmik" },
-  { id: "synthwave",       name: "🌃 Gece Yarısı Synthwave",             url: "https://assets.mixkit.co/music/132/132.mp3", tip: "Kozmik" },
-  { id: "cafe_jazz",       name: "☕ Rahat Kahve & Caz",                 url: "https://assets.mixkit.co/music/493/493.mp3", tip: "Kozmik" },
-
-  // ── 🔇 Instagram Trend ──
-  { id: "silent",          name: "🔇 Sessiz (Instagram Trend Sesi İçin)", url: null,                                         tip: "Önerilen" },
+  ...HARMONY_TRACKS.map((track) => ({ ...track, tip: "Sakin / düşünceli" })),
+  { id: "silent", name: "🔇 Sessiz", url: null, tip: "Sessiz" },
 ];
-
-// Tema Görsel Kategorisi ile Müzik Türü Uyum Matrisi:
-// Her temanın görsel atmosferine ve ruh haline %100 uyan 56-58 adet doğrulanmış Mixkit parçası
-export const TEMA_MUZIK_UYUM_HARITASI = {
-  "Doğa & Su": ["Chillout", "Ambient"],         // ~57 Parça: Okyanus, şelale, göl, sisli çam ormanı, yağmur damlaları
-  "Element & Doğa": ["Motivasyon", "Dramatik"], // ~56 Parça: Kamp ateşi, gün batımı & dağ, çöl, fırtına, şimşek
-  "Kozmik & Uzay": ["Kozmik", "Ambient"],       // ~58 Parça: Gece dolunayı, kuzey ışıkları, yıldızlararası galaksi
-  "Şehir & Gece": ["Kozmik", "Ambient"],        // ~58 Parça: Gece otoyolu, neon yağmurlu şehir
-  "Felsefe & Kültür": ["Piyano", "Dramatik"],   // ~56 Parça: Antik mermer heykel, kadim kütüphane
-  "Minimalist": ["Piyano", "Dramatik"],         // ~56 Parça: Mat siyah & altın, sade felsefi tasarım
-};
 
 export default function RemotionStudioPage({ tema = "dark", onBack }) {
   const T = TEMALAR[tema] || TEMALAR.dark;
@@ -147,8 +113,8 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   const recentBgsRef = useRef([]);
   const recentMusicRef = useRef([]);
   const recentQuotesRef = useRef([]);
-  const lastFontRef = useRef("");
-  const lastAnimRef = useRef("");
+
+
 
   // URL'deki adresi sayfayı yenilemeden güncelle (örn: /reel_20260915_2322_ORNJ)
   const guncelleUrl = (id) => {
@@ -233,7 +199,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
   ];
 
   // ✨ TEK TIKLA BÜTÜN ÖZELLİKLERİ BİRBİRİYLE UYUMLU ŞEKİLDE OLUŞTURAN SİHİRLİ MOTOR
-  // 50 DOĞRULANMIŞ TEMA × 170 MÜZİK × 7 FONT × 7 AKIŞ STİLİ = 416,500 EŞSİZ KOMBİNASYON!
+  // Sözün konusuna göre sınırlandırılmış seçenekler kullanılır.
   const sihirliUyumluOlustur = async () => {
     try {
       setYukleniyor(true);
@@ -263,46 +229,15 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
       }
       yenidenCaptionUret(quoteText, quoteAuthor, quoteCat);
 
-      // 2. TÜM 99 TEMA ARASINDAN SEÇİM (Son 20 temayı eleyerek tam döngü sağlar)
-      const tumTemaKeyleri = Object.keys(NATURE_PRESETS); // 99 Tema!
-      const temaAdaylari = tumTemaKeyleri.filter((id) => !recentBgsRef.current.includes(id));
-      const secilenBg = temaAdaylari.length > 0
-        ? temaAdaylari[Math.floor(Math.random() * temaAdaylari.length)]
-        : tumTemaKeyleri[Math.floor(Math.random() * tumTemaKeyleri.length)];
-
+      const harmony = createReelHarmony(quoteText, quoteCat, recentBgsRef.current, recentMusicRef.current);
+      const secilenBg = harmony.bgStyle;
+      const presetObj = NATURE_PRESETS[secilenBg];
+      const secilenRenk = harmony.highlightColor;
+      const secilenTrack = harmony.track;
+      const secilenFont = harmony.fontFamily;
+      const secilenAnim = harmony.animStyle;
       recentBgsRef.current = [secilenBg, ...recentBgsRef.current.slice(0, 20)];
-      lastBgRef.current = secilenBg;
-
-      const presetObj = NATURE_PRESETS[secilenBg] || NATURE_PRESETS.ocean;
-      // ZIT KONTRAST RENGİ: Her temanın kendine ait zıt kontrast rengi (Mavi okyanusta Altın, Günbatımında Buz Mavisi vb.)
-      const secilenRenk = presetObj.contrastAccent || "#f5c542";
-
-      // 3. TEMA İLE %100 UYUMLU MÜZİK SEÇİMİ
-      // Seçilen temanın görsel atmosferine göre (Örn: Okyanus -> Chillout/Ambient, Dağ/Ateş -> Motivasyon/Dramatik, Heykel -> Piyano)
-      // 170 parçalık havuzdan 56-58'lik tam uyumlu tür kümesi filtrelenir ve son 30 parça elenerek çalınır.
-      const uyumluTurler = TEMA_MUZIK_UYUM_HARITASI[presetObj.cat] || ["Ambient", "Chillout", "Piyano", "Dramatik", "Motivasyon", "Kozmik"];
-      const kategoriMuzikleri = VERIFIED_MIXKIT_TRACKS.filter((t) => uyumluTurler.includes(t.genre));
-      const muzikHavuzu = kategoriMuzikleri.length > 0 ? kategoriMuzikleri : VERIFIED_MIXKIT_TRACKS;
-
-      const muzikAdaylari = muzikHavuzu.filter((t) => !recentMusicRef.current.includes(t.url));
-      const secilenTrack = muzikAdaylari.length > 0
-        ? muzikAdaylari[Math.floor(Math.random() * muzikAdaylari.length)]
-        : muzikHavuzu[Math.floor(Math.random() * muzikHavuzu.length)];
-
       recentMusicRef.current = [secilenTrack.url, ...recentMusicRef.current.slice(0, 30)];
-      lastMusicUrlRef.current = secilenTrack.url;
-
-      // 4. TÜM 7 FONT ARASINDAN SEÇİM (Bir önceki fonttan kesinlikle farklı)
-      const fontAdaylari = STUDIO_FONTS.filter((f) => f.id !== lastFontRef.current);
-      const secilenFontObj = fontAdaylari[Math.floor(Math.random() * fontAdaylari.length)];
-      const secilenFont = secilenFontObj.id;
-      lastFontRef.current = secilenFont;
-
-      // 5. TÜM 7 AKIŞ STİLİ ARASINDAN SEÇİM (Bir önceki stilden kesinlikle farklı)
-      const animAdaylari = STUDIO_ANIM_STYLES.filter((a) => a.id !== lastAnimRef.current);
-      const secilenAnimObj = animAdaylari[Math.floor(Math.random() * animAdaylari.length)];
-      const secilenAnim = secilenAnimObj.id;
-      lastAnimRef.current = secilenAnim;
 
       // 6. YENİ EŞSİZ VİDEO ID
       const yeniVideoId = generateVideoId();
@@ -329,49 +264,28 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
 
   // Sadece müzik değiştirmek isteyen kullanıcı için (Mevcut temayla uyumlu 56-58 parça arasından)
   const rastgeleMuzikSec = () => {
-    const mevcutPreset = NATURE_PRESETS[bgStyle] || NATURE_PRESETS.ocean;
-    const uyumluTurler = TEMA_MUZIK_UYUM_HARITASI[mevcutPreset.cat] || ["Ambient", "Chillout", "Piyano", "Dramatik", "Motivasyon", "Kozmik"];
-    const kategoriMuzikleri = VERIFIED_MIXKIT_TRACKS.filter((t) => uyumluTurler.includes(t.genre));
-    const muzikHavuzu = kategoriMuzikleri.length > 0 ? kategoriMuzikleri : VERIFIED_MIXKIT_TRACKS;
-    const adaylar = muzikHavuzu.filter((t) => !recentMusicRef.current.includes(t.url));
-    const track = (adaylar.length > 0 ? adaylar : muzikHavuzu)[
-      Math.floor(Math.random() * (adaylar.length || muzikHavuzu.length))
-    ];
-    if (track) {
-      setMusicUrl(track.url);
-      setMusicId(track.id);
-      setMusicName(track.name);
-      recentMusicRef.current = [track.url, ...recentMusicRef.current.slice(0, 30)];
-    }
+    const track = pickHarmonyItem(getHarmonyProfile(quote, category).tracks, [musicUrl, ...recentMusicRef.current], (item) => item.url);
+    setMusicUrl(track.url);
+    setMusicId(track.id);
+    setMusicName(track.name);
+    recentMusicRef.current = [track.url, ...recentMusicRef.current.slice(0, 30)];
   };
 
-  // Sadece tema değiştirmek isteyen kullanıcı için (99 havuzundan tek tıkla yeni tema ve ona uyumlu müzik)
+  // Mevcut sözü değiştirmeden tema, müzik ve tipografiyi birlikte eşleştir.
   const rastgeleTemaSec = () => {
-    const tumTemaKeyleri = Object.keys(NATURE_PRESETS);
-    const adaylar = tumTemaKeyleri.filter((id) => !recentBgsRef.current.includes(id));
-    const secilen = (adaylar.length > 0 ? adaylar : tumTemaKeyleri)[Math.floor(Math.random() * (adaylar.length || tumTemaKeyleri.length))];
-    if (secilen) {
-      const p = NATURE_PRESETS[secilen];
-      setBgStyle(secilen);
-      setSelectedCat(p.cat || "Doğa & Su");
-      setHighlightColor(p.contrastAccent || "#f5c542");
-      recentBgsRef.current = [secilen, ...recentBgsRef.current.slice(0, 20)];
-
-      // Yeni seçilen temanın görseline uyan müzik havuzundan parça seç
-      const uyumluTurler = TEMA_MUZIK_UYUM_HARITASI[p.cat] || ["Ambient", "Chillout"];
-      const katMuzik = VERIFIED_MIXKIT_TRACKS.filter((t) => uyumluTurler.includes(t.genre));
-      const muzikHavuzu = katMuzik.length > 0 ? katMuzik : VERIFIED_MIXKIT_TRACKS;
-      const adayMuzikler = muzikHavuzu.filter((t) => !recentMusicRef.current.includes(t.url));
-      const trk = (adayMuzikler.length > 0 ? adayMuzikler : muzikHavuzu)[
-        Math.floor(Math.random() * (adayMuzikler.length || muzikHavuzu.length))
-      ];
-      if (trk) {
-        setMusicUrl(trk.url);
-        setMusicId(trk.id);
-        setMusicName(trk.name);
-        recentMusicRef.current = [trk.url, ...recentMusicRef.current.slice(0, 30)];
-      }
-    }
+    const harmony = createReelHarmony(quote, category, [bgStyle, ...recentBgsRef.current], [musicUrl, ...recentMusicRef.current]);
+    setBgStyle(harmony.bgStyle);
+    setSelectedCat(NATURE_PRESETS[harmony.bgStyle].cat);
+    setHighlightColor(harmony.highlightColor);
+    setFontFamily(harmony.fontFamily);
+    setAnimStyle(harmony.animStyle);
+    setMusicUrl(harmony.track.url);
+    setMusicId(harmony.track.id);
+    setMusicName(harmony.track.name);
+    setCustomBgUrl("");
+    setCustomAudioName("");
+    recentBgsRef.current = [harmony.bgStyle, ...recentBgsRef.current.slice(0, 20)];
+    recentMusicRef.current = [harmony.track.url, ...recentMusicRef.current.slice(0, 30)];
   };
 
   // Sayfa açıldığında: Eğer belirli bir video veya söz talep edilmişse onu yükle; yoksa rastgele sihirli oluştur
@@ -442,7 +356,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
         // Müzik ve İsmi (Mixkit / Presets eşleştirmesi)
         setMusicUrl(vMusicUrl);
         setMusicId(vMusicId);
-        const matchedMusic = VERIFIED_MIXKIT_TRACKS.find((t) => t.url === vMusicUrl || t.id === vMusicId)
+        const matchedMusic = [...HARMONY_TRACKS, ...VERIFIED_MIXKIT_TRACKS].find((t) => t.url === vMusicUrl || t.id === vMusicId)
           || MUSIC_PRESETS.find((t) => t.url === vMusicUrl || t.id === vMusicId);
         setMusicName(matchedMusic ? matchedMusic.name : vData.musicName || "🎵 Kayıtlı Reels Müziği");
 
@@ -1372,11 +1286,11 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#a0a0a0", display: "flex", alignItems: "center", gap: 6 }}>
-                <Volume2 size={15} color="#38bdf8" /> Fon Müziği / Ses (170 Parça):
+                <Volume2 size={15} color="#38bdf8" /> Fon Müziği / Ses:
               </label>
               <button
                 onClick={rastgeleMuzikSec}
-                title="170 parçalık doğrulanmış Mixkit havuzundan rastgele farklı bir müzik çalar"
+                title="Sözün konusuna göre önerilen müziklerden seçer"
                 style={{
                   background: "rgba(56, 189, 248, 0.15)",
                   border: "1px solid #38bdf8",
@@ -1391,7 +1305,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
                   gap: 5,
                 }}
               >
-                🎲 170'ten Başka Müzik
+                🎵 Söze Uygun Müzik
               </button>
             </div>
 
@@ -1412,7 +1326,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
               <Music size={14} color="#38bdf8" />
               <span style={{ fontWeight: 700, color: "#38bdf8" }}>Çalan:</span>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {musicName || "170 Müzik Havuzundan Parça"}
+                {musicName || "Seçili müzik"}
               </span>
             </div>
 
@@ -1496,7 +1410,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
               </label>
               <button
                 onClick={rastgeleTemaSec}
-                title="99 sinematik tema arasından rastgele farklı bir tema seçer"
+                title="Mevcut sözü koruyarak tema, müzik ve yazı stilini eşleştirir"
                 style={{
                   background: "rgba(192, 132, 252, 0.15)",
                   border: "1px solid #c084fc",
@@ -1511,7 +1425,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
                   gap: 5,
                 }}
               >
-                🎲 99'dan Başka Tema
+                ✨ Bu Söze Uyumla
               </button>
             </div>
 

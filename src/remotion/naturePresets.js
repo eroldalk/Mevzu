@@ -163,7 +163,7 @@ export const NATURE_PRESETS = {
   },
   "felsefe_columns": {
     "id": "felsefe_columns",
-    "name": "🏛️ Akropolis Mermer Sütunlar",
+    "name": "🏛️ Müze Sergi Salonu",
     "cat": "Felsefe & Kültür",
     "url": "https://images.unsplash.com/photo-1564399579883-451a5d44ec08?auto=format&fit=crop&w=1080&q=80",
     "accent": "#e2e8f0",

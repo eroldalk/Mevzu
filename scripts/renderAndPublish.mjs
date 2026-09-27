@@ -241,11 +241,11 @@ async function applyHumanJitter() {
   await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000));
 }
 
-// ─── 170 Adet Doğrulanmış Mixkit Müzik Seçici ───────────────────────────
-import { getMixkitByCategory } from "../src/utils/mixkitLibrary.js";
+// ─── Sözün Konusuna Göre Müzik Seçimi ───────────────────────────
+import { createReelHarmony } from "../src/utils/reelHarmony.js";
 
-function getMusicForCategory(categoryStr = "") {
-  const track = getMixkitByCategory(categoryStr);
+function getMusicForCategory(categoryStr = "", quote = "") {
+  const { track } = createReelHarmony(quote, categoryStr);
   return {
     musicId: track.id,
     musicUrl: track.url,
@@ -356,41 +356,12 @@ async function markQuoteAsUsed(quoteId, slotId, dateStr, videoId) {
   }
 }
 
-// 65 Adet Arka Plan Havuzundan Kategoriye Uygun Zengin ve Tekrarsız Seçici
-import { NATURE_PRESETS } from "../src/remotion/naturePresets.js";
-
-function getBackgroundForCategory(categoryStr = "") {
-  const catUpper = (categoryStr || "").toUpperCase();
-  let targetCat = "Felsefe & Kültür";
-
-  if (catUpper.includes("DOĞA") || catUpper.includes("SU") || catUpper.includes("DENİZ") || catUpper.includes("HUZUR")) {
-    targetCat = "Doğa & Su";
-  } else if (catUpper.includes("MOTİVASYON") || catUpper.includes("GÜÇ") || catUpper.includes("SPOR") || catUpper.includes("DİRENÇ")) {
-    targetCat = "Element & Doğa";
-  } else if (catUpper.includes("KOZMİK") || catUpper.includes("UZAY") || catUpper.includes("GECE") || catUpper.includes("ŞEHİR")) {
-    targetCat = "Kozmik & Uzay";
-  }
-
-  const matchingKeys = Object.keys(NATURE_PRESETS).filter(
-    (k) => NATURE_PRESETS[k].cat === targetCat
-  );
-  const candidates = matchingKeys.length > 0 ? matchingKeys : Object.keys(NATURE_PRESETS);
-  const selectedKey = candidates[Math.floor(Math.random() * candidates.length)];
-  const preset = NATURE_PRESETS[selectedKey] || NATURE_PRESETS.ocean;
-
-  return {
-    bgStyle: preset.id,
-    primaryColor: preset.accent,
-    highlightColor: preset.contrastAccent || "#f5c542",
-  };
-}
-
 // 2. Remotion ile 1080x1920 MP4 Video Render
 async function renderReelsVideo({ quote, author, category, videoId, musicUrl, musicId }) {
   console.log("🎬 Remotion video motoru hazırlanıyor...");
   const entryPoint = path.join(rootDir, "src", "remotion", "index.js");
 
-  const bgConfig = getBackgroundForCategory(category);
+  const bgConfig = createReelHarmony(quote, category);
 
   const bundleLocation = await bundle({
     entryPoint,
@@ -405,8 +376,8 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
     musicUrl,
     primaryColor: bgConfig.primaryColor,
     highlightColor: bgConfig.highlightColor,
-    animStyle: "viral_pop",
-    fontFamily: "'Montserrat', sans-serif",
+    animStyle: bgConfig.animStyle,
+    fontFamily: bgConfig.fontFamily,
   };
 
   const composition = await selectComposition({
@@ -538,7 +509,7 @@ async function main() {
     console.log("🎵 Müzik seçiliyor...");
     const musicData = manualReqDoc?.musicUrl 
       ? { musicId: "custom_mobile", musicUrl: manualReqDoc.musicUrl, source: "mobile" }
-      : await getMusicForCategory(quoteData.cat);
+      : await getMusicForCategory(quoteData.cat, quoteData.quote);
     console.log(`🎵 Seçilen: ${musicData.musicId} (${musicData.source}) → ${musicData.musicUrl}`);
 
     // 4. Açıklamayı Gemini AI ile üret (Kategori parantezi olmadan temiz)

@@ -165,17 +165,23 @@ export const MevzuReelsComposition = ({
             const words = cleanText.split(/\s+/).filter(Boolean).length;
             const isSerif = fontFamily && (fontFamily.includes("Cinzel") || fontFamily.includes("Playfair"));
 
-            let size = 44;
-            if (len > 120 || words > 18) {
+            // 1080px tuvalde telefondan okunabilecek büyük sözler.
+            // Uzun metinlerde yazar bölümüne taşmamak için kademeli küçült.
+            let size;
+            if (len > 400 || words > 65) {
               size = 32;
-            } else if (len > 85 || words > 13) {
-              size = 36;
-            } else if (len > 55 || words > 8) {
-              size = 40;
-            } else if (len > 30 || words > 5) {
+            } else if (len > 240 || words > 38) {
               size = 44;
+            } else if (len > 120 || words > 18) {
+              size = 52;
+            } else if (len > 85 || words > 13) {
+              size = 58;
+            } else if (len > 55 || words > 8) {
+              size = 64;
+            } else if (len > 30 || words > 5) {
+              size = 70;
             } else {
-              size = 46;
+              size = 76;
             }
 
             if (isSerif) {

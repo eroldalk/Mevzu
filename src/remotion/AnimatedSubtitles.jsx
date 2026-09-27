@@ -51,6 +51,8 @@ export const AnimatedSubtitles = ({
         width: "100%",
         maxWidth: 920,
         padding: "0 24px",
+        boxSizing: "border-box",
+        minWidth: 0,
         textAlign: "center",
         lineHeight: 1.45,
         wordBreak: "break-word",
