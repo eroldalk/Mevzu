@@ -19,6 +19,8 @@ export default function SettingsPage({ tema, onBack }) {
   const [shortQuotesOnly, setShortQuotesOnly] = useState(true);
   const [storyEnabled, setStoryEnabled] = useState(true);
   const [storySlot, setStorySlot] = useState("08:00");
+  const [slotFormats, setSlotFormats] = useState({});
+  const [collaborators, setCollaborators] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
   // Firestore'dan kalıcı ayarları yükle
@@ -42,6 +44,12 @@ export default function SettingsPage({ tema, onBack }) {
           }
           if (data.storySlot) {
             setStorySlot(data.storySlot);
+          }
+          if (data.slotFormats) {
+            setSlotFormats(data.slotFormats);
+          }
+          if (Array.isArray(data.collaborators)) {
+            setCollaborators(data.collaborators.join(", "));
           }
           if (data.updatedAt) {
             setLastUpdated(new Date(data.updatedAt).toLocaleString("tr-TR"));
@@ -73,8 +81,13 @@ export default function SettingsPage({ tema, onBack }) {
   // Belirli bir slot saatini güncelle
   const updateSlotTime = (index, value) => {
     const updated = [...slots];
+    const previous = updated[index];
     updated[index] = value;
     setSlots(updated);
+    setSlotFormats((formats) => {
+      const { [previous]: format, ...rest } = formats;
+      return format ? { ...rest, [value]: format } : rest;
+    });
   };
 
   // Yeni slot saati ekle
@@ -106,6 +119,8 @@ export default function SettingsPage({ tema, onBack }) {
       const payload = {
         dailyCount: cleanSlots.length,
         slots: cleanSlots,
+        slotFormats: Object.fromEntries(cleanSlots.map((slot) => [slot, slotFormats[slot] || "reels"])),
+        collaborators: collaborators.split(",").map((name) => name.trim().replace(/^@/, "")).filter(Boolean).slice(0, 3),
         shortQuotesOnly,
         storyEnabled,
         storySlot: storySlot || "08:00",
@@ -272,7 +287,7 @@ export default function SettingsPage({ tema, onBack }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Clock size={16} color={T.gold} />
                       <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>
-                        {idx + 1}. Video Saati:
+                        {idx + 1}. Gönderi Saati:
                       </span>
                     </div>
 
@@ -298,6 +313,16 @@ export default function SettingsPage({ tema, onBack }) {
                           </button>
                         ))}
                       </div>
+
+                      {/* Gönderi türü */}
+                      <select
+                        value={slotFormats[slotTime] || "reels"}
+                        onChange={(e) => setSlotFormats((formats) => ({ ...formats, [slotTime]: e.target.value }))}
+                        style={{ background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, padding: "6px 8px", fontSize: 12, fontFamily: "inherit" }}
+                      >
+                        <option value="reels">Reels</option>
+                        <option value="post">Post</option>
+                      </select>
 
                       {/* Özel saat girişi */}
                       <input
@@ -333,6 +358,15 @@ export default function SettingsPage({ tema, onBack }) {
                   </div>
                 ))}
               </div>
+
+              {/* Ortak gönderi */}
+              <input
+                type="text"
+                value={collaborators}
+                onChange={(e) => setCollaborators(e.target.value)}
+                placeholder="Ortak hesaplar (virgülle, en fazla 3)"
+                style={{ width: "100%", boxSizing: "border-box", marginTop: 12, background: T.bg2, border: `1px solid ${T.border}`, borderRadius: 8, color: T.text, padding: "8px 10px", fontSize: 13, fontFamily: "inherit" }}
+              />
             </div>
 
             {/* 3. Günün Sözü Hikayesi (Instagram Story) */}

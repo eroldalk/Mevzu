@@ -1,0 +1,7 @@
+﻿{
+  "enabled": true,
+  "timezone": "Europe/Istanbul",
+  "schedule": ["08:30", "11:00", "13:00", "16:00", "19:00", "21:00"],
+  "maxRetries": 3,
+  "retryDelaySeconds": 30
+}

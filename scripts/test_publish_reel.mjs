@@ -23,7 +23,7 @@ function getCredentials() {
   };
 }
 
-export async function uploadAndPublishReel({ videoFilePath, caption, thumbOffset = 2500 }) {
+export async function uploadAndPublishReel({ videoFilePath, caption, thumbOffset = 2500, collaborators = [] }) {
   const { accountId, accessToken } = getCredentials();
   if (!accountId || !accessToken) {
     throw new Error("INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN bulunamadı!");
@@ -47,6 +47,7 @@ export async function uploadAndPublishReel({ videoFilePath, caption, thumbOffset
       media_type: "REELS",
       caption: caption || "#mevzu",
       thumb_offset: thumbOffset, // 2.5 saniye (2500ms) - tüm yazının eksiksiz göründüğü an kapak olur!
+      ...(collaborators.length ? { collaborators } : {}),
       access_token: accessToken,
     }),
   });

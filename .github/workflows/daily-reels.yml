@@ -6,10 +6,17 @@ on:
   # Gece Asla Çalışmaz! Yalnızca 08:00 - 23:00 Türkiye saatleri arasında uyanır (05:00 - 20:00 UTC).
   # Belirlediğiniz saat gelmediyse veya gönderi zaten atıldıysa 2 saniyede kendini kapatır.
   schedule:
-    - cron: '0,30 5-20 * * *'
+    - cron: '7,37 5-20 * * *'
 
   # GitHub Paneli Üzerinden "Run Workflow" Butonuyla İstenildiği An Manuel Tetikleme
   workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mevzu-publish
+  cancel-in-progress: false
 
 jobs:
   render-and-publish:
@@ -41,6 +48,9 @@ jobs:
           META_APP_ID: ${{ secrets.META_APP_ID }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/renderAndPublish.mjs
 
       - name: 💾 Üretilen Video ve Kapağı Yedekle (Artifacts)

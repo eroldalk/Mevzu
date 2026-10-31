@@ -5,3 +5,4 @@ dist/
 *.local
 output/*.mp4
 output/*.jpg
+telegram/data/

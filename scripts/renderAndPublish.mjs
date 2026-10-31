@@ -8,14 +8,22 @@
 // 6. Instagram Graph API (Reels Publishing) ile doğrudan yayına alır.
 
 import { initializeApp } from "firebase/app";
+import { REEL_FPS, getReelSeconds } from "../src/utils/reelDuration.js";
+import { pickCta } from "../src/utils/captionGenerator.js";
 import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, runTransaction, limit } from "firebase/firestore";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, renderStill } from "@remotion/renderer";
 import { generateInstagramCaption } from "./generateCaption.mjs";
 import { uploadAndPublishReel } from "./test_publish_reel.mjs";
+import { planSlot, MAX_DELAY_MINUTES } from "./slotPlanner.mjs";
+import { hostImage, publishImage } from "./publishImage.mjs";
+import { formatFailure, formatSkipped, formatSuccess, sendTelegramMedia, sendTelegramMessage } from "./telegramNotify.mjs";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+
+// Söz ilk kareden görünür; kapak için yarım saniyelik sakin kare yeterli
+const COVER_FRAME = 15;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -50,12 +58,17 @@ async function getDynamicSlots() {
       const data = snap.data();
       if (Array.isArray(data.slots) && data.slots.length > 0) {
         console.log(`⚙️  Firestore'dan dinamik yayın saatleri okundu: [${data.slots.join(", ")}]`);
-        return data.slots.map((s) => {
+        const toSlot = (s, format) => {
           const [hStr, mStr] = s.split(":");
           const hour = parseInt(hStr, 10);
           const minute = parseInt(mStr || "0", 10);
-          return { id: s, hour, minute, name: `Planlanan Yayın (${s})` };
-        });
+          return { id: s, hour, minute, format, name: `Planlanan Yayın (${s})` };
+        };
+        const slots = data.slots.map((s) => toSlot(s, data.slotFormats?.[s] || "reels"));
+        if (data.storyEnabled && data.storySlot && !data.slots.includes(data.storySlot)) {
+          slots.push(toSlot(data.storySlot, "story"));
+        }
+        return slots;
       }
     }
   } catch (err) {
@@ -163,69 +176,88 @@ async function releaseSlotLockOnFailure(dateStr, slotId, errorMessage) {
   }
 }
 
-// Yayınlanması gereken ama gecikmiş/atlanmış aktif slotu bul (Asla erken yayın yapmaz!)
+// Bugünkü slotların durumunu videos ve slot_locks kayıtlarından toplar
+async function getSlotStates(dateStr, slots) {
+  const states = {};
+  const nowMs = Date.now();
+
+  for (const s of slots) {
+    const lockKey = `${dateStr}_${s.id.replace(":", "")}`;
+    const snapLock = await getDoc(doc(db, "slot_locks", lockKey));
+    if (!snapLock.exists()) continue;
+    const lockData = snapLock.data();
+    if (lockData.status === "processing") {
+      // 20 dakikadan eski kilit ölü sayılır; slot yeniden denenebilir
+      const lockedAtMs = lockData.lockedAt ? new Date(lockData.lockedAt).getTime() : 0;
+      states[s.id] = nowMs - lockedAtMs < 20 * 60 * 1000 ? "processing" : "failed";
+    } else {
+      states[s.id] = lockData.status;
+    }
+  }
+
+  const snapVideos = await getDocs(query(
+    collection(db, "videos"),
+    where("date", "==", dateStr),
+    where("published", "==", true)
+  ));
+  snapVideos.forEach((vDoc) => {
+    const { slotId } = vDoc.data();
+    if (slotId) states[slotId] = "published";
+  });
+
+  return states;
+}
+
+async function markSlotSkipped(dateStr, slot, currentMinutes) {
+  const lockKey = `${dateStr}_${slot.id.replace(":", "")}`;
+  const delayMinutes = currentMinutes - (slot.hour * 60 + slot.minute);
+  await setDoc(doc(db, "slot_locks", lockKey), {
+    slotId: slot.id,
+    date: dateStr,
+    status: "skipped",
+    skippedAt: new Date().toISOString(),
+    delayMinutes,
+  }, { merge: true });
+  console.warn(`⏭️  [SLOT ATLANDI] [${slot.id}] ${delayMinutes} dk gecikti (sınır: ${MAX_DELAY_MINUTES} dk).`);
+  await sendTelegramMessage(formatSkipped({ slotId: slot.id, delayMinutes }));
+}
+
+// Yayınlanması gereken en eski slotu bul (Asla erken yayın yapmaz!)
 async function determineActiveSlot() {
   const { dateStr, hour, minute, currentMinutes } = getTurkeyNow();
   const timeFormatted = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   console.log(`🕒 Türkiye Saati: ${timeFormatted} (Tarih: ${dateStr})`);
 
   const activeSlots = await getDynamicSlots();
+  const slotStates = await getSlotStates(dateStr, activeSlots);
+  const { slot, skipped, blockedBy } = planSlot({ slots: activeSlots, currentMinutes, slotStates });
 
-  // Şu anki zamana denk gelen veya zamanı geçmiş aktif slotu tespit et (ASLA ERKEN YAYIN YOK!)
-  let candidateSlot = null;
-  for (let i = activeSlots.length - 1; i >= 0; i--) {
-    const s = activeSlots[i];
-    const sMinutes = s.hour * 60 + s.minute;
-    // 3 dakika erken tetiklenme toleransı
-    if (process.env.FORCE_PUBLISH === "true" || currentMinutes + 3 >= sMinutes) {
-      candidateSlot = s;
-      break;
-    }
-  }
-
-  if (!candidateSlot) {
-    console.log(`ℹ️  Günün ilk yayın saati (${activeSlots[0].id}) henüz gelmedi. Bekleniyor.`);
+  if (blockedBy) {
+    console.log(`⏳ [${blockedBy.id}] slotu şu anda işleniyor. Çift çalışmayı önlemek için çıkılıyor.`);
     return null;
   }
 
-  console.log(`🎯 İncelenen Aktif Slot: [${candidateSlot.id}] — ${candidateSlot.name}`);
+  for (const s of skipped) await markSlotSkipped(dateStr, s, currentMinutes);
 
-  // 1. Kontrol: 'videos' koleksiyonunda bu slot bugün yayınlanmış mı?
-  const videosRef = collection(db, "videos");
-  const qVideos = query(
-    videosRef, 
-    where("date", "==", dateStr), 
-    where("slotId", "==", candidateSlot.id), 
-    where("published", "==", true)
-  );
-  const snapVideos = await getDocs(qVideos);
-  if (!snapVideos.empty) {
-    console.log(`✅ [${candidateSlot.id}] slotu bugün zaten başarıyla yayınlanmış (videos tablosunda mevcut). İşlem gerekmiyor.`);
+  if (!slot) {
+    console.log("ℹ️  Şu an yayınlanacak slot yok (saati gelmedi veya bugünkü slotlar tamamlandı).");
     return null;
   }
 
-  // 2. Kontrol: 'slot_locks' koleksiyonunda bu slot yayınlanmış veya işleniyor mu?
-  const lockKey = `${dateStr}_${candidateSlot.id.replace(":", "")}`;
-  const lockRef = doc(db, "slot_locks", lockKey);
-  const snapLock = await getDoc(lockRef);
-  if (snapLock.exists()) {
-    const lockData = snapLock.data();
-    if (lockData.status === "published") {
-      console.log(`✅ [${candidateSlot.id}] slotu kilit tablosunda 'published' olarak mühürlü. İşlem gerekmiyor.`);
-      return null;
-    }
-    if (lockData.status === "processing") {
-      const nowMs = Date.now();
-      const lockedAtMs = lockData.lockedAt ? new Date(lockData.lockedAt).getTime() : 0;
-      if (nowMs - lockedAtMs < 20 * 60 * 1000) {
-        console.log(`⏳ [${candidateSlot.id}] slotu şu anda başka bir işlem tarafından üretiliyor/yayınlanıyor (Kilit: ${Math.round((nowMs - lockedAtMs) / 1000)} sn önce alındı). Çift çalışmayı önlemek için çıkılıyor.`);
-        return null;
-      }
-    }
-  }
+  console.log(`🚨 [YAYIN GEREKİYOR] [${slot.id}] slotu için yayın başlatılacak!`);
+  return { slot, dateStr };
+}
 
-  console.log(`🚨 [YAYIN GEREKİYOR] [${candidateSlot.id}] slotu için yayın başlatılacak!`);
-  return { slot: candidateSlot, dateStr };
+// Yayınlanan gönderinin Instagram bağlantısını alır
+async function fetchPermalink(mediaId) {
+  try {
+    const url = `https://graph.facebook.com/v21.0/${mediaId}?fields=permalink&access_token=${process.env.INSTAGRAM_ACCESS_TOKEN}`;
+    const json = await (await fetch(url)).json();
+    return json.permalink || null;
+  } catch (err) {
+    console.warn("⚠️ Instagram bağlantısı alınamadı:", err.message);
+    return null;
+  }
 }
 
 // ─── Doğal Algoritma Jitter Motoru (Hafif İnsan Taklidi Gecikme) ───────────
@@ -244,12 +276,31 @@ async function applyHumanJitter() {
 // ─── Sözün Konusuna Göre Müzik Seçimi ───────────────────────────
 import { createReelHarmony } from "../src/utils/reelHarmony.js";
 
-function getMusicForCategory(categoryStr = "", quote = "") {
-  const { track } = createReelHarmony(quote, categoryStr);
+// Son yayınların tema, müzik ve açıklamaları tekrarı önlemek için okunur
+async function fetchRecentMedia() {
+  try {
+    const snap = await getDocs(query(collection(db, "videos"), where("published", "==", true)));
+    const recent = snap.docs.map((d) => d.data())
+      .sort((a, b) => String(b.renderedAt).localeCompare(String(a.renderedAt)))
+      .slice(0, 12);
+    return {
+      themes: recent.map((v) => v.bgId).filter(Boolean),
+      music: recent.map((v) => v.musicUrl).filter(Boolean),
+      captions: recent.map((v) => v.caption).filter(Boolean),
+    };
+  } catch (err) {
+    console.warn("⚠️ Son yayınlar okunamadı:", err.message);
+    return { themes: [], music: [], captions: [] };
+  }
+}
+
+function getMusicForCategory(categoryStr = "", quote = "", recentMusic = []) {
+  const { track, mood } = createReelHarmony(quote, categoryStr, [], recentMusic);
   return {
     musicId: track.id,
     musicUrl: track.url,
     musicName: track.name,
+    mood,
     source: "mixkit",
   };
 }
@@ -357,11 +408,11 @@ async function markQuoteAsUsed(quoteId, slotId, dateStr, videoId) {
 }
 
 // 2. Remotion ile 1080x1920 MP4 Video Render
-async function renderReelsVideo({ quote, author, category, videoId, musicUrl, musicId }) {
+async function renderReelsVideo({ quote, author, category, videoId, musicUrl, musicId, recentThemes = [] }) {
   console.log("🎬 Remotion video motoru hazırlanıyor...");
   const entryPoint = path.join(rootDir, "src", "remotion", "index.js");
 
-  const bgConfig = createReelHarmony(quote, category);
+  const bgConfig = createReelHarmony(quote, category, recentThemes);
 
   const bundleLocation = await bundle({
     entryPoint,
@@ -410,14 +461,14 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
   const coverFileName = `${videoId}_cover.jpg`;
   const coverLocation = path.join(outputDir, coverFileName);
 
-  console.log(`📸 Instagram kapak fotoğrafı oluşturuluyor (Kare 75 - Tüm Metin Görünür): ${coverFileName}`);
+  console.log(`📸 Instagram kapak fotoğrafı oluşturuluyor (Tüm Metin Görünür): ${coverFileName}`);
   try {
     await renderStill({
       composition,
       serveUrl: bundleLocation,
       output: coverLocation,
       inputProps: renderProps,
-      frame: 75,
+      frame: COVER_FRAME,
       imageFormat: "jpeg",
     });
     console.log(`🎉 Kapak fotoğrafı hazır: ${coverLocation}`);
@@ -429,6 +480,59 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
 }
 
 
+
+// Post (1080x1350) ve hikâye (1080x1920) görseli üretir
+async function renderImage({ compositionId, quote, author, category, videoId, recentThemes = [] }) {
+  const bgConfig = createReelHarmony(quote, category, recentThemes);
+  const serveUrl = await bundle({ entryPoint: path.join(rootDir, "src", "remotion", "index.js"), webpackOverride: (config) => config });
+  const inputProps = {
+    quote,
+    author,
+    category,
+    bgStyle: bgConfig.bgStyle,
+    musicUrl: null,
+    primaryColor: bgConfig.primaryColor,
+    highlightColor: bgConfig.highlightColor,
+    animStyle: bgConfig.animStyle,
+    fontFamily: bgConfig.fontFamily,
+  };
+  const composition = await selectComposition({ serveUrl, id: compositionId, inputProps });
+  const outputDir = path.join(rootDir, "output");
+  await fs.mkdir(outputDir, { recursive: true });
+  const fileName = `${videoId}.jpg`;
+  const outputLocation = path.join(outputDir, fileName);
+  await renderStill({ composition, serveUrl, output: outputLocation, inputProps, frame: 0, imageFormat: "jpeg" });
+  return { outputLocation, fileName, coverFileName: fileName, bgId: bgConfig.bgStyle };
+}
+
+async function getCollaborators() {
+  try {
+    const snap = await getDoc(doc(db, "settings", "schedule"));
+    const list = snap.exists() ? snap.data().collaborators : null;
+    return Array.isArray(list) ? list.filter(Boolean).slice(0, 3) : [];
+  } catch (err) {
+    console.warn("⚠️ Ortak hesaplar okunamadı:", err.message);
+    return [];
+  }
+}
+
+// Hikâye, son yayınlanan sözü yeniden kullanır; havuzdan söz harcamaz
+async function publishStorySlot(dateStr, slotId) {
+  const snap = await getDocs(query(collection(db, "videos"), where("published", "==", true)));
+  const latest = snap.docs.map((d) => d.data())
+    .filter((v) => v.format !== "story" && v.quote)
+    .sort((a, b) => String(b.renderedAt).localeCompare(String(a.renderedAt)))[0];
+  if (!latest) throw new Error("Hikâye için yayınlanmış söz bulunamadı.");
+
+  const videoId = generateVideoId();
+  const { outputLocation, fileName, bgId } = await renderImage({ compositionId: "MevzuReels", quote: latest.quote, author: latest.author, category: latest.category, videoId });
+  const imageUrl = await hostImage(outputLocation);
+  const instagramId = await publishImage({ imageUrl, mediaType: "STORIES" });
+  const now = new Date().toISOString();
+  await setDoc(doc(db, "videos", videoId), { videoId, format: "story", quote: latest.quote, author: latest.author, category: latest.category, slotId, date: dateStr, bgId, fileName, renderedAt: now, publishedAt: now, instagramId, published: true });
+  await finalizeSlotLockSuccess(dateStr, slotId, videoId, instagramId);
+  await sendTelegramMedia(outputLocation, formatSuccess({ slotId: `${slotId} hikâye`, quote: latest.quote, author: latest.author, permalink: null }), "photo");
+}
 
 // --- ANA ÇALIŞTIRMA FONKSİYONU ---
 async function main() {
@@ -479,11 +583,21 @@ async function main() {
     console.log(`🔑 Slot kilidi başarıyla bu işlem için mühürlendi (Runner: ${lockResult.runnerId}).`);
   }
 
+  const format = activeSlotInfo?.slot.format || "reels";
+  let renderedMedia = null;
+  let renderedCaption = "";
+
   // Kritik işlem bloğu: Hata durumunda kilidi serbest bırakır ve bildirim verir
   try {
     // Doğal Algoritma Jitter'ı (5-20 saniye mikro bekleme)
     if (activeSlotInfo && !manualReqDoc) {
       await applyHumanJitter();
+    }
+
+    if (format === "story") {
+      await publishStorySlot(currentDateStr, currentSlotId);
+      console.log(`✅ TAMAMLANDI → Hikâye: [${currentSlotId}]`);
+      return;
     }
 
     // 1. Benzersiz video ID üret
@@ -505,11 +619,15 @@ async function main() {
       console.log(`📖 Havuzdan seçilen söz: "${quoteData.quote}" — ${quoteData.author} [${quoteData.cat}]`);
     }
 
-    // 3. Pixabay'den kategoriye uygun müzik seç
+    const recentMedia = await fetchRecentMedia();
+
+    // 3. Söze uygun müzik seç
     console.log("🎵 Müzik seçiliyor...");
-    const musicData = manualReqDoc?.musicUrl 
+    const musicData = format === "post"
+      ? { musicId: null, musicUrl: null, mood: null, source: null }
+      : manualReqDoc?.musicUrl
       ? { musicId: "custom_mobile", musicUrl: manualReqDoc.musicUrl, source: "mobile" }
-      : await getMusicForCategory(quoteData.cat, quoteData.quote);
+      : getMusicForCategory(quoteData.cat, quoteData.quote, recentMedia.music);
     console.log(`🎵 Seçilen: ${musicData.musicId} (${musicData.source}) → ${musicData.musicUrl}`);
 
     // 4. Açıklamayı Gemini AI ile üret (Kategori parantezi olmadan temiz)
@@ -518,6 +636,7 @@ async function main() {
       quote: quoteData.quote,
       author: quoteData.author,
       category: quoteData.cat,
+      recentCaptions: recentMedia.captions,
     });
 
     console.log("\n--- ÜRETİLEN INSTAGRAM AÇIKLAMASI ---");
@@ -525,19 +644,22 @@ async function main() {
     console.log("------------------------------------\n");
 
     // 5. Videoyu renderla
-    const { outputLocation, fileName, bgId, coverFileName } = await renderReelsVideo({
-      quote: quoteData.quote,
-      author: quoteData.author,
-      category: quoteData.cat,
-      videoId,
-      musicUrl: musicData.musicUrl,
-      musicId: musicData.musicId,
-    });
+    const mediaInput = { quote: quoteData.quote, author: quoteData.author, category: quoteData.cat, videoId, recentThemes: recentMedia.themes };
+    const { outputLocation, fileName, bgId, coverFileName } = format === "post"
+      ? await renderImage({ ...mediaInput, compositionId: "MevzuPost" })
+      : await renderReelsVideo({ ...mediaInput, musicUrl: musicData.musicUrl, musicId: musicData.musicId });
+    renderedMedia = outputLocation;
+    renderedCaption = caption;
 
     // 6. Firestore'a video kaydı yaz
     try {
       await setDoc(doc(db, "videos", videoId), {
         videoId,
+        format,
+        caption,
+        ctaType:       pickCta(quoteData.quote).type,
+        mood:          musicData.mood || null,
+        durationSeconds: format === "post" ? null : getReelSeconds(quoteData.quote),
         quoteId:       quoteData.id || null,
         quote:         quoteData.quote,
         author:        quoteData.author,
@@ -566,12 +688,16 @@ async function main() {
     const hasToken = process.env.INSTAGRAM_ACCOUNT_ID && process.env.INSTAGRAM_ACCESS_TOKEN;
 
     if (hasToken) {
-      console.log("🚀 Meta Resumable Upload API ile Reels yayına alınıyor...");
+      console.log("🚀 Instagram'a yayın başlatılıyor...");
+      const collaborators = await getCollaborators();
       try {
-        instagramPostId = await uploadAndPublishReel({
+        instagramPostId = format === "post"
+          ? await publishImage({ imageUrl: await hostImage(outputLocation), caption, collaborators })
+          : await uploadAndPublishReel({
           videoFilePath: outputLocation,
           caption,
-          thumbOffset: 2500,
+          collaborators,
+          thumbOffset: COVER_FRAME * 1000 / REEL_FPS,
         });
       } catch (uploadErr) {
         console.error("❌ [KRİTİK HATA] Instagram Reels yüklenemedi:", uploadErr.message);
@@ -625,11 +751,21 @@ async function main() {
       }
     }
 
+    if (instagramPostId) {
+      const permalink = await fetchPermalink(instagramPostId);
+      await sendTelegramMedia(outputLocation, formatSuccess({ slotId: currentSlotId, quote: quoteData.quote, author: quoteData.author, permalink }), format === "post" ? "photo" : "video");
+    }
+
     console.log("==========================================");
     console.log(`✅ TAMAMLANDI → Slot: [${currentSlotId}] | Video: ${videoId}`);
     console.log("==========================================");
   } catch (err) {
     console.error("❌ [AKIŞ HATASI] İşlem sırasında kritik hata:", err.message);
+    await sendTelegramMessage(formatFailure({ slotId: currentSlotId, message: err.message }));
+    // Sistem atamazsa içerik telefona gelir, elle paylaşılabilir
+    if (renderedMedia) {
+      await sendTelegramMedia(renderedMedia, renderedCaption, format === "post" ? "photo" : "video");
+    }
     if (activeSlotInfo && currentSlotId !== "MANUAL") {
       await releaseSlotLockOnFailure(currentDateStr, currentSlotId, err.message);
     }

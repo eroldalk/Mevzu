@@ -1,6 +1,8 @@
 import React from "react";
 import { Composition } from "remotion";
+import "./loadFonts";
 import { MevzuReelsComposition } from "./MevzuReelsComposition";
+import { getReelFrames } from "../utils/reelDuration";
 
 export const RemotionRoot = () => {
   return (
@@ -8,7 +10,8 @@ export const RemotionRoot = () => {
       <Composition
         id="MevzuReels"
         component={MevzuReelsComposition}
-        durationInFrames={240} // 8 saniye @ 30 FPS (Keşfet döngüsü için ideal süre)
+        durationInFrames={240}
+        calculateMetadata={({ props }) => ({ durationInFrames: getReelFrames(props.quote) })}
         fps={30}
         width={1080}
         height={1920}
@@ -23,6 +26,15 @@ export const RemotionRoot = () => {
           animStyle: "highlight",
           fontFamily: "'DM Sans', sans-serif",
         }}
+      />
+      <Composition
+        id="MevzuPost"
+        component={MevzuReelsComposition}
+        durationInFrames={1}
+        fps={30}
+        width={1080}
+        height={1350}
+        defaultProps={{ quote: "Olmadıysa vardır bir hayır.", author: "Mevzu", category: "UMUT", bgStyle: "forest", animStyle: "instant", fontFamily: "'Playfair Display', serif" }}
       />
     </>
   );

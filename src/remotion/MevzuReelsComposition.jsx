@@ -3,6 +3,9 @@ import { useCurrentFrame, useVideoConfig, spring, interpolate, Audio } from "rem
 import { CinematicBackground, NATURE_PRESETS } from "./CinematicBackground";
 import { AnimatedSubtitles } from "./AnimatedSubtitles";
 
+const MUSIC_VOLUME = 0.6;
+const MUSIC_START_SECONDS = 6;
+
 export const MevzuReelsComposition = ({
   quote = "İnsan bir kamıştır, ama düşünen bir kamıştır.",
   author = "Blaise Pascal",
@@ -16,7 +19,17 @@ export const MevzuReelsComposition = ({
   musicUrl = null,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames, height } = useVideoConfig();
+  // Reels'te Instagram arayüzü için güvenli alan bırakılır; post görselinde gerek yok
+  const isPost = height < 1920;
+
+  // Müzik girişi atlanır; yumuşak başlar, sonda kısılır
+  const musicVolume = (f) => interpolate(
+    f,
+    [0, 0.5 * fps, durationInFrames - fps, durationInFrames],
+    [0, MUSIC_VOLUME, MUSIC_VOLUME, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
 
   const currentPreset = NATURE_PRESETS[bgStyle] || NATURE_PRESETS.ocean;
   const themeAccent = currentPreset.accent || primaryColor;
@@ -27,8 +40,9 @@ export const MevzuReelsComposition = ({
     fps,
     config: { damping: 14, stiffness: 100 },
   });
-  const logoOpacity = interpolate(logoSpring, [0, 1], [0, 1]);
-  const logoY = interpolate(logoSpring, [0, 1], [-25, 0]);
+  const isInstant = animStyle === "instant";
+  const logoOpacity = isInstant ? 1 : interpolate(logoSpring, [0, 1], [0, 1]);
+  const logoY = isInstant ? 0 : interpolate(logoSpring, [0, 1], [-25, 0]);
 
   // Alt yazar & rozet giriş animasyonu
   const footerSpring = spring({
@@ -36,8 +50,8 @@ export const MevzuReelsComposition = ({
     fps,
     config: { damping: 14, stiffness: 100 },
   });
-  const footerOpacity = interpolate(footerSpring, [0, 1], [0, 1]);
-  const footerY = interpolate(footerSpring, [0, 1], [25, 0]);
+  const footerOpacity = isInstant ? 1 : interpolate(footerSpring, [0, 1], [0, 1]);
+  const footerY = isInstant ? 0 : interpolate(footerSpring, [0, 1], [25, 0]);
 
   // Ritmik ses dalgası çubukları animasyonu
   const bars = [0, 1, 2, 3, 4].map((i) => {
@@ -50,7 +64,7 @@ export const MevzuReelsComposition = ({
       style={{
         position: "relative",
         width: 1080,
-        height: 1920,
+        height,
         backgroundColor: "#08080a",
         fontFamily,
         color: "#ffffff",
@@ -66,13 +80,13 @@ export const MevzuReelsComposition = ({
       />
 
       {/* İsteğe bağlı Fon Müziği */}
-      {musicUrl && <Audio src={musicUrl} />}
+      {musicUrl && <Audio src={musicUrl} volume={musicVolume} startFrom={MUSIC_START_SECONDS * fps} />}
 
       {/* 2. ÜST BÖLÜM: #MEVZU Marka Logosu (Safe-Zone: 280px) */}
       <div
         style={{
           position: "absolute",
-          top: 280,
+          top: isPost ? 90 : 280,
           left: 0,
           width: "100%",
           display: "flex",
@@ -199,7 +213,7 @@ export const MevzuReelsComposition = ({
       <div
         style={{
           position: "absolute",
-          bottom: 480,
+          bottom: isPost ? 90 : 480,
           left: 0,
           width: "100%",
           display: "flex",

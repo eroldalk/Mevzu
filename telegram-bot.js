@@ -1,0 +1,1 @@
+﻿import "./telegram/bot.js";

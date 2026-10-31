@@ -1,5 +1,6 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig, spring, interpolate } from "remotion";
+import { layoutQuote } from "../utils/quoteLayout";
 
 export const AnimatedSubtitles = ({
   text = "",
@@ -16,6 +17,16 @@ export const AnimatedSubtitles = ({
   const totalWords = words.length;
 
   if (totalWords === 0) return null;
+
+  // Söz 0. kareden itibaren tam ve iri görünür; profil ızgarasında da okunur.
+  if (animStyle === "instant") {
+    const layout = layoutQuote(text);
+    return (
+      <div style={{ width: "100%", textAlign: "center", fontFamily, fontSize: layout.fontSize, lineHeight: layout.lineHeight, fontWeight: 700, color: "#ffffff", textShadow: "0 2px 12px rgba(0,0,0,0.95), 0 6px 34px rgba(0,0,0,0.85)" }}>
+        {layout.lines.map((line) => <div key={line} style={{ whiteSpace: "nowrap" }}>{line}</div>)}
+      </div>
+    );
+  }
 
   // 1. Genel Cümle Giriş Efekti (Container Entrance):
   // Video açıldığında cümlenin tamamı 0-20. kareler arasında yumuşakça belirir (fade & float).

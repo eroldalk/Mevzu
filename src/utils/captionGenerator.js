@@ -6,32 +6,15 @@
 // 3. Kaydet & Yorum Çağrısı (CTA)
 // 4. 6-8 Odaklı Viral Hashtag
 
-// Bilinen yazar - eser eşleşmeleri tablosu
-const KNOWN_AUTHORS_WORKS = {
-  "niccolò machiavelli": "Prens",
-  "machiavelli": "Prens",
-  "marcus aurelius": "Kendime Düşünceler",
-  "seneca": "Yaşamın Kısalığı Üzerine",
-  "epiktetos": "El Kitabı (Enkheiridion)",
-  "friedrich nietzsche": "İyinin ve Kötünün Ötesinde",
-  "nietzsche": "Böyle Buyurdu Zerdüşt",
-  "arthur schopenhauer": "Yaşam Bilgeliği Üzerine",
-  "schopenhauer": "İsteme ve Tasarım Olarak Dünya",
-  "platon": "Devlet",
-  "aristoteles": "Nikomakhos'a Etik",
-  "sun tzu": "Savaş Sanatı",
-  "montaigne": "Denemeler",
-  "lao tzu": "Tao Te Ching",
-  "mevlana": "Mesnevi",
-  "rumi": "Mesnevi",
-  "fyodor dostoyevski": "Karamazov Kardeşler",
-  "dostoyevski": "Yeraltından Notlar",
-  "franz kafka": "Dönüşüm",
-  "albert camus": "Yabancı",
-  "emil cioran": "Çürümenin Kitabı",
-  "publilius syrus": "Özdeyişler",
-  "ömer hayyam": "Rubailer",
-};
+// Birine söylenecek sözde paylaşım, kendine hatırlatılacak sözde kaydetme istenir
+const SEND_PATTERN = /(^|[\s,.!?"“])(seni|sana|birine|dost|arkadaş|özle|sevdi|gönül|kırgın|kırıl|yanında)/;
+
+export function pickCta(quote = "") {
+  const text = quote.toLocaleLowerCase("tr-TR");
+  return SEND_PATTERN.test(text)
+    ? { type: "send", text: "Bunu birine gönder 💌" }
+    : { type: "save", text: "Kaydet, sonra lazım olur 📌" };
+}
 
 // Kategoriye ve temaya göre düşündürücü soru havuzu (Fallback & Çeşitlilik)
 const CATEGORY_QUESTIONS = {
@@ -79,14 +62,14 @@ const CATEGORY_QUESTIONS = {
 
 // Kategoriye ve yazara özel hashtag haritası
 const AUTHOR_HASHTAGS = {
-  "niccolò machiavelli": ["#machiavelli", "#prens", "#güç", "#strateji", "#liderlik"],
-  "machiavelli": ["#machiavelli", "#prens", "#güç", "#strateji", "#liderlik"],
-  "marcus aurelius": ["#marcusaurelius", "#kendimedüşünceler", "#stoacılık", "#içhuzur"],
-  "seneca": ["#seneca", "#yaşamınkısalığı", "#stoacılık", "#zaman"],
+  "niccolò machiavelli": ["#machiavelli", "#güç", "#strateji", "#liderlik"],
+  "machiavelli": ["#machiavelli", "#güç", "#strateji", "#liderlik"],
+  "marcus aurelius": ["#marcusaurelius", "#stoacılık", "#içhuzur"],
+  "seneca": ["#seneca", "#stoacılık", "#zaman"],
   "epiktetos": ["#epiktetos", "#stoa", "#özgürlük", "#zihingücü"],
-  "nietzsche": ["#nietzsche", "#felsefe", "#böylebuyurduzerdüşt", "#güçistenci"],
-  "schopenhauer": ["#schopenhauer", "#pesimizm", "#yaşambilgeliği", "#derindüşünce"],
-  "sun tzu": ["#suntzu", "#savaşsanatı", "#strateji", "#zafer"],
+  "nietzsche": ["#nietzsche", "#felsefe", "#güçistenci"],
+  "schopenhauer": ["#schopenhauer", "#pesimizm", "#derindüşünce"],
+  "sun tzu": ["#suntzu", "#strateji", "#zafer"],
 };
 
 const CATEGORY_HASHTAGS = {
@@ -104,16 +87,15 @@ export async function generateInstagramCaption({
   quote = "",
   author = "Mevzu",
   category = "FELSEFE",
+  recentCaptions = [],
 }) {
   const cleanAuthor = (author || "Mevzu").trim();
   const cleanCat = (category || "FELSEFE").trim().toUpperCase();
 
-  // 1. YAZAR & ESER BİLGİSİ (Kategori parantezi kaldırıldı)
+  // 1. YAZAR BİLGİSİ: Söz o esere ait olmayabilir, eser adı yazılmaz
   const authorKey = cleanAuthor.toLowerCase();
-  const knownWork = KNOWN_AUTHORS_WORKS[authorKey];
-  const baslikSatiri = knownWork
-    ? `${cleanAuthor} — ${knownWork}.`
-    : `${cleanAuthor}.`;
+  const baslikSatiri = authorKey === "mevzu" ? "" : `${cleanAuthor}.`;
+  const cta = pickCta(quote);
 
   // 2. GEMINI API VARSA (Çok daha kişiselleştirilmiş derin soru üretir)
   const apiKey =
@@ -131,16 +113,19 @@ Kategori: "${cleanCat}"
 
 KRİTİK KURALLAR:
 1. SÖZÜ AÇIKLAMAYA ASLA YAZMA! Videoda zaten okunuyor.
-2. İlk satır yazar ve eser bilgisi olsun: "${baslikSatiri}" (Asla kategori adı ekleme).
+2. ${baslikSatiri ? `İlk satır yazar bilgisi olsun: "${baslikSatiri}". Eser adı yazma.` : "Yazar satırı yazma."} (Asla kategori adı ekleme).
 3. Açıklamada, başta veya sonda ASLA (Sanat), (Gündem), (Felsefe) gibi kategori ibaresi YAZMA!
 4. İkinci kısım: İzleyiciyi düşündüren, yorumlarda tartışma başlatacak ÇOK ÇARPICI, derin ve merak uyandırıcı 1-2 cümlelik bir soru sor (Bu soru söze ve kategoriye tam uysun).
-5. Üçüncü kısım: "Düşünceni yorumlarda belirt 👇\nKendine hatırlatmak için kaydetmeyi unutma 📌"
+5. Üçüncü kısım tam olarak şu satır: "${cta.text}"
 6. Dördüncü kısım: 6-8 adet çok odaklı hashtag (Sözle, yazarla ve kategoriyle ilgili, en sonda #mevzu).
+
+7. Soru bu söze özel olsun, şu son açıklamalardaki soruları tekrar etme:
+${recentCaptions.slice(0, 10).join("\n---\n") || "(yok)"}
 
 Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -160,6 +145,8 @@ Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
         if (gen && gen.trim()) {
           return gen.trim();
         }
+      } else {
+        console.warn(`Gemini yanıt vermedi (HTTP ${res.status}), yerel şablona geçiliyor.`);
       }
     } catch (e) {
       console.warn("Gemini API çağrısı yapılamadı, akıllı şablon motoruna geçiliyor:", e.message);
@@ -176,7 +163,9 @@ Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
     }
   }
 
-  const soruHavuzu = CATEGORY_QUESTIONS[matchedCatKey] || CATEGORY_QUESTIONS.FELSEFE;
+  const anaHavuz = CATEGORY_QUESTIONS[matchedCatKey] || CATEGORY_QUESTIONS.FELSEFE;
+  const tazeSorular = anaHavuz.filter((soru) => !recentCaptions.some((caption) => caption.includes(soru)));
+  const soruHavuzu = tazeSorular.length ? tazeSorular : anaHavuz;
   const secilenSoru = soruHavuzu[Math.floor(Math.random() * soruHavuzu.length)];
 
   // Hashtag kümesini oluştur
@@ -187,13 +176,5 @@ Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
     .slice(0, 8)
     .join(" ");
 
-  return `${baslikSatiri}
-
-${secilenSoru}
-
-Düşünceni yorumlarda belirt 👇
-Kendine hatırlatmak için kaydet 📌
-.
-.
-${allTags}`;
+  return `${baslikSatiri ? `${baslikSatiri}\n\n` : ""}${secilenSoru}\n\nDüşünceni yorumlarda belirt 👇\n${cta.text}\n.\n.\n${allTags}`;
 }

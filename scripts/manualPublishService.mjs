@@ -1,5 +1,6 @@
 // scripts/manualPublishService.mjs
 import path from "node:path";
+import { REEL_FPS } from "../src/utils/reelDuration.js";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { bundle } from "@remotion/bundler";
@@ -7,6 +8,9 @@ import { renderMedia, renderStill, selectComposition } from "@remotion/renderer"
 import { uploadAndPublishReel } from "./test_publish_reel.mjs";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, updateDoc, setDoc } from "firebase/firestore";
+
+// Söz ilk kareden görünür; kapak için yarım saniyelik sakin kare yeterli
+const COVER_FRAME = 15;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -107,7 +111,7 @@ export async function manualRenderAndPublish(params, onProgress = () => {}) {
       serveUrl: bundleLocation,
       output: coverLocation,
       inputProps: renderProps,
-      frame: 75,
+      frame: COVER_FRAME,
       imageFormat: "jpeg",
     });
     console.log(`[Manuel Yayın] Kapak görseli oluşturuldu: ${coverLocation}`);
@@ -121,7 +125,7 @@ export async function manualRenderAndPublish(params, onProgress = () => {}) {
   const instagramPostId = await uploadAndPublishReel({
     videoFilePath: outputLocation,
     caption: caption || `${quote} — ${author}\n\n#mevzu`,
-    thumbOffset: 2500,
+    thumbOffset: COVER_FRAME * 1000 / REEL_FPS,
   });
 
   onProgress({ step: "updating_db", message: "💾 Veritabanı ve arşiv güncelleniyor..." });

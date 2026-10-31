@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useCurrentFrame, useVideoConfig, interpolate, Video } from "remotion";
+import { useCurrentFrame, useVideoConfig, interpolate, Img, Video } from "remotion";
 
 import { NATURE_PRESETS } from "./naturePresets.js";
 export { NATURE_PRESETS };
@@ -10,7 +10,7 @@ export const CinematicBackground = ({
   customBgUrl = null,
 }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, height } = useVideoConfig();
   const [imgError, setImgError] = useState(false);
 
   const preset = NATURE_PRESETS[bgStyle] || NATURE_PRESETS.ocean;
@@ -49,7 +49,7 @@ export const CinematicBackground = ({
       style={{
         position: "absolute",
         width: 1080,
-        height: 1920,
+        height,
         backgroundColor: "#060709",
         overflow: "hidden",
       }}
@@ -77,7 +77,7 @@ export const CinematicBackground = ({
               }}
             />
           ) : (
-            <img
+            <Img
               src={bgMedia}
               crossOrigin="anonymous"
               onError={() => setImgError(true)}

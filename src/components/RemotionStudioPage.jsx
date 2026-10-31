@@ -8,6 +8,7 @@ import { generateVideoId } from "../utils/pixabayMusic";
 import { VERIFIED_MIXKIT_TRACKS } from "../utils/mixkitLibrary";
 import { createReelHarmony, getHarmonyProfile, pickHarmonyItem, HARMONY_TRACKS } from "../utils/reelHarmony";
 import { generateInstagramCaption } from "../utils/captionGenerator";
+import { getReelFrames } from "../utils/reelDuration";
 import { db } from "../utils/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { downloadInstagramCover } from "../utils/coverExporter";
@@ -641,7 +642,7 @@ export default function RemotionStudioPage({ tema = "dark", onBack }) {
                 musicUrl,
                 primaryColor: NATURE_PRESETS[bgStyle]?.accent || "#38bdf8",
               }}
-              durationInFrames={240}
+              durationInFrames={getReelFrames(quote)}
               compositionWidth={1080}
               compositionHeight={1920}
               fps={30}
