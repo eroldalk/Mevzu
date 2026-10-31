@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Settings, Clock, Plus, Trash2, CheckCircle2, Save, Sparkles, AlertCircle, ArrowLeft, RefreshCw, SunMedium } from "lucide-react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { db } from "../utils/firebase";
 import { TEMALAR } from "../utils/tema";
+import { buildTodayRows, getTurkeyDate } from "../utils/todaySlots";
 
 const DEFAULT_SLOTS = ["19:00"];
 
@@ -22,6 +23,18 @@ export default function SettingsPage({ tema, onBack }) {
   const [slotFormats, setSlotFormats] = useState({});
   const [collaborators, setCollaborators] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [todayRows, setTodayRows] = useState([]);
+
+  // Kayıtlı saatleri ve bugün çıkan gönderileri birlikte getirir
+  async function loadToday(savedSlots, savedFormats) {
+    const today = getTurkeyDate();
+    const videoSnap = await getDocs(query(collection(db, "videos"), where("date", "==", today)));
+    const videos = videoSnap.docs.map((d) => d.data());
+    const ids = [...new Set([...savedSlots, ...videos.map((video) => video.slotId).filter(Boolean)])];
+    const lockSnaps = await Promise.all(ids.map((id) => getDoc(doc(db, "slot_locks", `${today}_${id.replace(":", "")}`))));
+    const lockStatuses = Object.fromEntries(ids.map((id, i) => [id, lockSnaps[i].exists() ? lockSnaps[i].data().status : undefined]));
+    setTodayRows(buildTodayRows({ slots: savedSlots, slotFormats: savedFormats, videos, lockStatuses }));
+  }
 
   // Firestore'dan kalıcı ayarları yükle
   useEffect(() => {
@@ -54,6 +67,7 @@ export default function SettingsPage({ tema, onBack }) {
           if (data.updatedAt) {
             setLastUpdated(new Date(data.updatedAt).toLocaleString("tr-TR"));
           }
+          await loadToday(data.slots || [], data.slotFormats || {});
         }
       } catch (err) {
         console.error("Ayarlar yüklenirken hata:", err);
@@ -129,6 +143,7 @@ export default function SettingsPage({ tema, onBack }) {
       };
 
       await setDoc(docRef, payload, { merge: true });
+      await loadToday(payload.slots, payload.slotFormats);
       setLastUpdated(new Date().toLocaleString("tr-TR"));
       setKaydedildi(true);
       setTimeout(() => setKaydedildi(false), 3000);
@@ -196,6 +211,26 @@ export default function SettingsPage({ tema, onBack }) {
           </div>
         ) : (
           <>
+            {/* Bugünün yayınları: kayıtlı ayara göre */}
+            <div style={{
+              background: T.bg2, border: `1px solid ${T.border}`,
+              borderRadius: 16, padding: "22px 20px", display: "flex", flexDirection: "column", gap: 10,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>Bugünün Yayınları</span>
+              {todayRows.length === 0 && <span style={{ fontSize: 12, color: T.muted }}>Bugün için kayıtlı saat yok.</span>}
+              {todayRows.map((row) => (
+                <div key={row.id} style={{ background: T.bg3, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{row.id} · {row.format}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: row.status === "published" ? T.gold : T.muted }}>
+                      {row.label}{row.publishedAt ? ` (${row.publishedAt})` : ""}
+                    </span>
+                  </div>
+                  {row.quote && <div style={{ fontSize: 12, color: T.muted, marginTop: 4 }}>{row.quote}</div>}
+                </div>
+              ))}
+            </div>
+
             {/* 1. Günlük Reels Sayısı */}
             <div style={{
               background: T.bg2, border: `1px solid ${T.border}`,

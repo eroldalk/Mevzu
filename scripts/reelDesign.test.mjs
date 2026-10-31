@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { layoutQuote } from "../src/utils/quoteLayout.js";
+import { buildTodayRows, getTurkeyDate } from "../src/utils/todaySlots.js";
 import { getReelSeconds, getReelFrames } from "../src/utils/reelDuration.js";
 import { generateInstagramCaption, pickCta } from "../src/utils/captionGenerator.js";
 import { createReelHarmony, getQuoteMood, getHarmonyProfile } from "../src/utils/reelHarmony.js";
@@ -77,4 +78,23 @@ test("müzik duyguya göre seçilir ve son kullanılan tekrar etmez", () => {
   assert.ok(tracks.length >= 20);
   const recent = tracks.slice(0, tracks.length - 1).map((t) => t.url);
   assert.equal(createReelHarmony("Seni çok özledim.", "", [], recent).track.url, tracks[tracks.length - 1].url);
+});
+
+test("panel saati değişse de bugün çıkan gönderiler görünür", () => {
+  const now = Date.parse("2026-10-31T16:54:00Z");
+  const videos = [{ slotId: "06:30", published: true, quote: "Söz", publishedAt: "2026-10-31T10:41:00Z" }];
+  const rows = buildTodayRows({ slots: ["09:00", "19:00", "21:00"], videos, lockStatuses: { "09:00": "skipped" }, now });
+  assert.deepEqual(rows.map((r) => [r.id, r.status]), [["06:30", "published"], ["09:00", "skipped"], ["19:00", "late"], ["21:00", "waiting"]]);
+  assert.equal(rows[0].publishedAt, "13:41");
+  assert.equal(rows[0].quote, "Söz");
+});
+
+test("Türkiye tarihi gece yarısında doğru döner", () => {
+  assert.equal(getTurkeyDate(Date.parse("2026-10-31T21:30:00Z")), "2026-11-01");
+});
+
+test("kilidi yayınlanmış slot yayınlandı görünür, hata etiketlenir", () => {
+  const rows = buildTodayRows({ slots: ["09:00", "12:00"], lockStatuses: { "09:00": "published", "12:00": "failed" }, now: Date.parse("2026-10-31T12:00:00Z") });
+  assert.equal(rows[0].label, "Yayınlandı");
+  assert.equal(rows[1].label, "Hata, yeniden denenecek");
 });
