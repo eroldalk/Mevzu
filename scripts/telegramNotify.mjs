@@ -21,11 +21,12 @@ async function callTelegram(method, body, config) {
   if (!json.ok) throw new Error(`${method}: ${json.description || res.status}`);
 }
 
-export async function sendTelegramMessage(text) {
+export async function sendTelegramMessage(text, replyMarkup = null) {
   const config = getConfig();
   if (!config) return false;
   try {
     const body = new URLSearchParams({ chat_id: config.chatId, text: trim(text, 4000) });
+    if (replyMarkup) body.append("reply_markup", JSON.stringify(replyMarkup));
     await callTelegram("sendMessage", body, config);
     return true;
   } catch (err) {
@@ -35,7 +36,7 @@ export async function sendTelegramMessage(text) {
 }
 
 // mediaType: "video" | "photo"
-export async function sendTelegramMedia(filePath, caption, mediaType = "video") {
+export async function sendTelegramMedia(filePath, caption, mediaType = "video", replyMarkup = null) {
   const config = getConfig();
   if (!config) return false;
   try {
@@ -43,12 +44,13 @@ export async function sendTelegramMedia(filePath, caption, mediaType = "video") 
     const body = new FormData();
     body.append("chat_id", config.chatId);
     body.append("caption", trim(caption, CAPTION_LIMIT));
+    if (replyMarkup) body.append("reply_markup", JSON.stringify(replyMarkup));
     body.append(mediaType, new Blob([buffer]), path.basename(filePath));
     await callTelegram(mediaType === "video" ? "sendVideo" : "sendPhoto", body, config);
     return true;
   } catch (err) {
     console.warn("⚠️ Telegram medyası gönderilemedi, metin deneniyor:", err.message);
-    return sendTelegramMessage(caption);
+    return sendTelegramMessage(caption, replyMarkup);
   }
 }
 

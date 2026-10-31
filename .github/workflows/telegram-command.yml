@@ -1,0 +1,50 @@
+name: 🤖 Mevzu Telegram Komutu
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: preview, publish, refresh, cancel veya status
+        required: true
+      format:
+        description: post veya reels
+        required: false
+      text:
+        description: Söz ve tema
+        required: false
+      draft_id:
+        description: Taslak numarası
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mevzu-telegram
+  cancel-in-progress: false
+
+jobs:
+  run-command:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+      - run: npm ci
+      - run: npx remotion browser ensure
+      - name: Komutu çalıştır
+        env:
+          INPUT_ACTION: ${{ inputs.action }}
+          INPUT_FORMAT: ${{ inputs.format }}
+          INPUT_TEXT: ${{ inputs.text }}
+          INPUT_DRAFT_ID: ${{ inputs.draft_id }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/telegramCommand.mjs

@@ -8,8 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "remotion:preview": "remotion preview src/remotion/index.js",
-    "remotion:render": "remotion render src/remotion/index.js MevzuReels output/test_reel.mp4",
-    "telegram": "node telegram-bot.js"
+    "remotion:render": "remotion render src/remotion/index.js MevzuReels output/test_reel.mp4"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.524",
@@ -20,11 +19,9 @@
     "firebase": "^12.17.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.395.0",
-    "node-cron": "^4.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "remotion": "^4.0.524",
-    "telegraf": "^4.16.3"
+    "remotion": "^4.0.524"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
