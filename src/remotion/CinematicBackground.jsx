@@ -8,6 +8,7 @@ export const CinematicBackground = ({
   primaryColor = "#c9a84c",
   bgStyle = "ocean",
   customBgUrl = null,
+  monochrome = false,
 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames, height } = useVideoConfig();
@@ -85,7 +86,7 @@ export const CinematicBackground = ({
                 width: "100%",
                 height: "100%",
                 objectFit: "cover",
-                filter: "brightness(0.96) saturate(1.18)",
+                filter: monochrome ? "grayscale(1) contrast(1.12) brightness(0.95)" : "brightness(0.96) saturate(1.18)",
               }}
             />
           )}

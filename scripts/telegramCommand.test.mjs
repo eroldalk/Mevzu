@@ -1,6 +1,6 @@
 import test, { afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { draftButtons, parseRequest } from "./telegramRequest.mjs";
+import { draftButtons, findPlacePhotos, parseRequest } from "./telegramRequest.mjs";
 import worker from "../cloudflare/telegram-worker.js";
 
 const env = { TELEGRAM_BOT_TOKEN: "t", WEBHOOK_SECRET: "gizli", ALLOWED_USER_ID: "42", GITHUB_TOKEN: "g" };
@@ -78,4 +78,17 @@ test("/temalar GitHub'ı çalıştırmaz", async () => {
   await send(message("/temalar"));
   assert.equal(dispatches().length, 0);
   assert.ok(calls[0].body.text.includes("orman"));
+});
+
+test("sözün ilk harfi büyütülür", () => {
+  assert.equal(parseRequest("damlaya damlaya göl olur").quote, "Damlaya damlaya göl olur");
+  assert.equal(parseRequest("ince söz").quote, "İnce söz");
+});
+
+test("yapı adı havuzda bulunur", () => {
+  const pool = [{ id: 1, place: "kolezyum" }, { id: 2, place: "ozgurluk" }, { id: 3, place: "diger:ancient city" }];
+  assert.deepEqual(findPlacePhotos(pool, "Kolezyum").map((p) => p.id), [1]);
+  assert.deepEqual(findPlacePhotos(pool, "özgürlük heykeli").map((p) => p.id), [2]);
+  assert.deepEqual(findPlacePhotos(pool, "ancient"), []);
+  assert.deepEqual(findPlacePhotos(pool, "uzay"), []);
 });

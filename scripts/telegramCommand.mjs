@@ -16,7 +16,8 @@ import { getReelSeconds, REEL_FPS } from "../src/utils/reelDuration.js";
 import { buildTodayRows, getTurkeyDate } from "../src/utils/todaySlots.js";
 import { hostImage, publishImage } from "./publishImage.mjs";
 import { sendTelegramMedia, sendTelegramMessage } from "./telegramNotify.mjs";
-import { draftButtons, parseRequest } from "./telegramRequest.mjs";
+import { draftButtons, findPlacePhotos, parseRequest } from "./telegramRequest.mjs";
+import { choosePhoto, loadPool, photoUrl } from "./photoPool.mjs";
 import { uploadAndPublishReel } from "./test_publish_reel.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,7 +37,17 @@ async function pickUnusedQuote() {
   return { id: picked.id, quote: picked.quote.replace(/\s+/g, " ").trim(), author: picked.author || "Mevzu", cat: (picked.cat || "FELSEFE").toUpperCase() };
 }
 
-function buildProps({ quote, author, cat, theme }) {
+// Yayınların tekrarını önlemek için son açıklamalar ve kullanılan fotoğraflar okunur
+async function loadPublishedHistory() {
+  const snap = await getDocs(query(collection(db, "videos"), where("published", "==", true)));
+  const published = snap.docs.map((d) => d.data()).sort((a, b) => String(b.renderedAt).localeCompare(String(a.renderedAt)));
+  return {
+    captions: published.map((v) => v.caption).filter(Boolean).slice(0, 12),
+    photoIds: published.map((v) => v.photoId).filter(Boolean),
+  };
+}
+
+function buildProps({ quote, author, cat, theme, photo }) {
   const harmony = createReelHarmony(quote, cat);
   const bgStyle = theme || harmony.bgStyle;
   const preset = NATURE_PRESETS[bgStyle];
@@ -50,6 +61,8 @@ function buildProps({ quote, author, cat, theme }) {
     highlightColor: preset.contrastAccent || harmony.highlightColor,
     animStyle: harmony.animStyle,
     fontFamily: harmony.fontFamily,
+    photoUrl: photo ? photoUrl(photo) : null,
+    photoId: photo?.id || null,
     mood: harmony.mood,
     musicName: harmony.track.name,
   };
@@ -62,13 +75,13 @@ async function renderDraft(id, format, props) {
 
   if (format === "post") {
     const inputProps = { ...props, musicUrl: null };
-    const composition = await selectComposition({ serveUrl, id: "MevzuPost", inputProps });
+    const composition = await selectComposition({ serveUrl, id: props.photoUrl ? "MevzuNotePost" : "MevzuPost", inputProps });
     const output = path.join(outputDir, `${id}.jpg`);
     await renderStill({ composition, serveUrl, output, inputProps, frame: 0, imageFormat: "jpeg" });
     return output;
   }
 
-  const composition = await selectComposition({ serveUrl, id: "MevzuReels", inputProps: props });
+  const composition = await selectComposition({ serveUrl, id: props.photoUrl ? "MevzuNoteReels" : "MevzuReels", inputProps: props });
   const outputLocation = path.join(outputDir, `${id}.mp4`);
   await renderMedia({ composition, serveUrl, codec: "h264", outputLocation, inputProps: props });
   return outputLocation;
@@ -83,8 +96,10 @@ async function loadDraft(draftId) {
 async function preview({ format, text, draftId }) {
   const source = draftId ? await loadDraft(draftId) : null;
   const request = source ? { quote: null, theme: null, unknownTheme: null } : parseRequest(text);
-  if (request.unknownTheme) {
-    await sendTelegramMessage(`❌ "${request.unknownTheme}" adında tema yok. /temalar ile listeye bak.`);
+  const pool = await loadPool();
+  const placePhotos = request.unknownTheme ? findPlacePhotos(pool, request.unknownTheme) : [];
+  if (request.unknownTheme && !placePhotos.length) {
+    await sendTelegramMessage(`❌ "${request.unknownTheme}" adında tema veya yapı yok. /temalar ile listeye bak.`);
     return;
   }
 
@@ -95,8 +110,10 @@ async function preview({ format, text, draftId }) {
     ? { id: null, quote: request.quote, author: "Mevzu", cat: "MEVZU" }
     : await pickUnusedQuote();
 
-  const props = buildProps({ ...quoteData, theme: request.theme });
-  const caption = await generateInstagramCaption({ quote: quoteData.quote, author: quoteData.author, category: quoteData.cat });
+  const history = await loadPublishedHistory();
+  const photo = request.theme ? null : choosePhoto(placePhotos.length ? placePhotos : pool, history.photoIds);
+  const props = buildProps({ ...quoteData, theme: request.theme, photo });
+  const caption = await generateInstagramCaption({ quote: quoteData.quote, author: quoteData.author, category: quoteData.cat, recentCaptions: history.captions });
   const id = createId();
   const output = await renderDraft(id, finalFormat, props);
 
@@ -173,7 +190,8 @@ async function publish(draftId) {
       date: getTurkeyDate(),
       musicUrl: draft.format === "post" ? null : draft.props.musicUrl,
       musicName: draft.format === "post" ? null : draft.props.musicName,
-      bgId: draft.props.bgStyle,
+      bgId: draft.props.photoId ? `foto_${draft.props.photoId}` : draft.props.bgStyle,
+      photoId: draft.props.photoId || null,
       fileName: path.basename(output),
       renderedAt: now,
       publishedAt: now,

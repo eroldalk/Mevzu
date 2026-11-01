@@ -17,6 +17,7 @@ import { generateInstagramCaption } from "./generateCaption.mjs";
 import { uploadAndPublishReel } from "./test_publish_reel.mjs";
 import { planSlot, MAX_DELAY_MINUTES } from "./slotPlanner.mjs";
 import { hostImage, publishImage } from "./publishImage.mjs";
+import { choosePhoto, loadPool, photoUrl } from "./photoPool.mjs";
 import { formatFailure, formatSkipped, formatSuccess, sendTelegramMedia, sendTelegramMessage } from "./telegramNotify.mjs";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -280,17 +281,18 @@ import { createReelHarmony } from "../src/utils/reelHarmony.js";
 async function fetchRecentMedia() {
   try {
     const snap = await getDocs(query(collection(db, "videos"), where("published", "==", true)));
-    const recent = snap.docs.map((d) => d.data())
-      .sort((a, b) => String(b.renderedAt).localeCompare(String(a.renderedAt)))
-      .slice(0, 12);
+    const published = snap.docs.map((d) => d.data())
+      .sort((a, b) => String(b.renderedAt).localeCompare(String(a.renderedAt)));
+    const recent = published.slice(0, 12);
     return {
+      photoIds: published.map((v) => v.photoId).filter(Boolean),
       themes: recent.map((v) => v.bgId).filter(Boolean),
       music: recent.map((v) => v.musicUrl).filter(Boolean),
       captions: recent.map((v) => v.caption).filter(Boolean),
     };
   } catch (err) {
     console.warn("⚠️ Son yayınlar okunamadı:", err.message);
-    return { themes: [], music: [], captions: [] };
+    return { photoIds: [], themes: [], music: [], captions: [] };
   }
 }
 
@@ -408,7 +410,7 @@ async function markQuoteAsUsed(quoteId, slotId, dateStr, videoId) {
 }
 
 // 2. Remotion ile 1080x1920 MP4 Video Render
-async function renderReelsVideo({ quote, author, category, videoId, musicUrl, musicId, recentThemes = [] }) {
+async function renderReelsVideo({ quote, author, category, videoId, musicUrl, musicId, recentThemes = [], photo = null }) {
   console.log("🎬 Remotion video motoru hazırlanıyor...");
   const entryPoint = path.join(rootDir, "src", "remotion", "index.js");
 
@@ -429,11 +431,12 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
     highlightColor: bgConfig.highlightColor,
     animStyle: bgConfig.animStyle,
     fontFamily: bgConfig.fontFamily,
+    photoUrl: photo ? photoUrl(photo) : null,
   };
 
   const composition = await selectComposition({
     serveUrl: bundleLocation,
-    id: "MevzuReels",
+    id: photo ? "MevzuNoteReels" : "MevzuReels",
     inputProps: renderProps,
   });
 
@@ -476,13 +479,13 @@ async function renderReelsVideo({ quote, author, category, videoId, musicUrl, mu
     console.warn("⚠️ Kapak görseli üretilirken uyarı:", stillErr.message);
   }
 
-  return { outputLocation, fileName, coverLocation, coverFileName, bgId: bgConfig.bgStyle };
+  return { outputLocation, fileName, coverLocation, coverFileName, bgId: photo ? `foto_${photo.id}` : bgConfig.bgStyle };
 }
 
 
 
 // Post (1080x1350) ve hikâye (1080x1920) görseli üretir
-async function renderImage({ compositionId, quote, author, category, videoId, recentThemes = [] }) {
+async function renderImage({ compositionId, quote, author, category, videoId, recentThemes = [], photo = null }) {
   const bgConfig = createReelHarmony(quote, category, recentThemes);
   const serveUrl = await bundle({ entryPoint: path.join(rootDir, "src", "remotion", "index.js"), webpackOverride: (config) => config });
   const inputProps = {
@@ -495,6 +498,7 @@ async function renderImage({ compositionId, quote, author, category, videoId, re
     highlightColor: bgConfig.highlightColor,
     animStyle: bgConfig.animStyle,
     fontFamily: bgConfig.fontFamily,
+    photoUrl: photo ? photoUrl(photo) : null,
   };
   const composition = await selectComposition({ serveUrl, id: compositionId, inputProps });
   const outputDir = path.join(rootDir, "output");
@@ -502,7 +506,7 @@ async function renderImage({ compositionId, quote, author, category, videoId, re
   const fileName = `${videoId}.jpg`;
   const outputLocation = path.join(outputDir, fileName);
   await renderStill({ composition, serveUrl, output: outputLocation, inputProps, frame: 0, imageFormat: "jpeg" });
-  return { outputLocation, fileName, coverFileName: fileName, bgId: bgConfig.bgStyle };
+  return { outputLocation, fileName, coverFileName: fileName, bgId: photo ? `foto_${photo.id}` : bgConfig.bgStyle };
 }
 
 async function getCollaborators() {
@@ -644,9 +648,10 @@ async function main() {
     console.log("------------------------------------\n");
 
     // 5. Videoyu renderla
-    const mediaInput = { quote: quoteData.quote, author: quoteData.author, category: quoteData.cat, videoId, recentThemes: recentMedia.themes };
+    const photo = manualReqDoc ? null : choosePhoto(await loadPool(), recentMedia.photoIds);
+    const mediaInput = { quote: quoteData.quote, author: quoteData.author, category: quoteData.cat, videoId, recentThemes: recentMedia.themes, photo };
     const { outputLocation, fileName, bgId, coverFileName } = format === "post"
-      ? await renderImage({ ...mediaInput, compositionId: "MevzuPost" })
+      ? await renderImage({ ...mediaInput, compositionId: "MevzuNotePost" })
       : await renderReelsVideo({ ...mediaInput, musicUrl: musicData.musicUrl, musicId: musicData.musicId });
     renderedMedia = outputLocation;
     renderedCaption = caption;
@@ -656,6 +661,7 @@ async function main() {
       await setDoc(doc(db, "videos", videoId), {
         videoId,
         format,
+        photoId:       photo?.id || null,
         caption,
         ctaType:       pickCta(quoteData.quote).type,
         mood:          musicData.mood || null,

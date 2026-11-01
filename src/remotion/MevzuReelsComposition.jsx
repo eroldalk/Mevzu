@@ -16,6 +16,7 @@ export const MevzuReelsComposition = ({
   animStyle = "highlight",
   bgStyle = "ocean", // "ocean", "forest", "sunset", "aurora", "rain", "dark"
   customBgUrl = null,
+  monochrome = false,
   musicUrl = null,
 }) => {
   const frame = useCurrentFrame();
@@ -77,6 +78,7 @@ export const MevzuReelsComposition = ({
         primaryColor={themeAccent}
         bgStyle={bgStyle}
         customBgUrl={customBgUrl}
+        monochrome={monochrome}
       />
 
       {/* İsteğe bağlı Fon Müziği */}
