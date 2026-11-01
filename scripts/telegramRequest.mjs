@@ -18,10 +18,23 @@ const asciiName = (text = "") => text
   .replace(/\s+/g, " ")
   .trim();
 
-// "kolezyum", "Özgürlük Heykeli" gibi adları havuzdaki yapılarla eşleştirir
+// Ülke ve bölge adları birden çok yapıyı kapsar
+const PLACE_GROUPS = {
+  turkiye: /ayasofya|sultanahmet|suleymaniye|selimiye|galata|kiz kulesi|efes|bergama|aspendos|side|nemrut|mardin|safranbolu|kapadokya|turkey|istanbul|topkapi|ottoman|pamukkale/,
+  italya: /kolezyum|roma forumu|pantheon|pompeii|trevi|pisa|venedik|st peter/,
+  yunanistan: /akropolis|atina|delfi|greek/,
+  misir: /piramit|sfenks|luxor karnak/,
+  avrupa: /eyfel|zafer taki|notre dame|louvre|big ben|stonehenge|sagrada|neuschwanstein|brandenburg|segovia|elhamra|kurtuba/,
+  asya: /tac mahal|cin seddi|angkor|semerkant|buhara|petronas/,
+  amerika: /ozgurluk|brooklyn|golden gate|kurtarici isa|machu picchu|chichen/,
+};
+
+// "kolezyum", "Özgürlük Heykeli", "Türkiye" gibi adları havuzdaki yapılarla eşleştirir
 export function findPlacePhotos(pool, name) {
   const wanted = asciiName(name);
   if (!wanted) return [];
+  const group = PLACE_GROUPS[wanted];
+  if (group) return pool.filter((photo) => group.test(asciiName(photo.place)));
   return pool.filter((photo) => {
     const place = asciiName(photo.place);
     return !place.startsWith("diger:") && (place.includes(wanted) || wanted.includes(place));

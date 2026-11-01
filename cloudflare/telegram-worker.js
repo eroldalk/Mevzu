@@ -7,12 +7,20 @@ const WORKFLOW_URL = "https://api.github.com/repos/eroldalk/Mevzu/actions/workfl
 const HELP = `Komutlar:
 /post — Havuzdan söz, otomatik tema
 /reels — Aynısı, video olarak
-/post söz | tema — Kendi sözün ve temanla
-/reels söz | tema — Aynısı, video olarak
-/temalar — Tema listesi
+/post söz | seçim — Kendi sözün, istersen bölge veya yapı
+/reels söz | seçim — Aynısı, video olarak
+/temalar — Bölge, yapı ve tema listesi
 /durum — Bugünün yayınları ve kalan söz`;
 
-const THEMES = "Temalar: orman, gün batımı, yağmur, şehir, gece, deniz";
+const THEMES = `Kullanım: /post söz | seçim
+
+Bölgeler: türkiye, italya, yunanistan, mısır, avrupa, asya, amerika
+
+Yapılar: ayasofya, sultanahmet, süleymaniye, selimiye, galata, kız kulesi, efes, bergama, aspendos, nemrut, mardin, safranbolu, kapadokya, kolezyum, pantheon, pompeii, trevi, pisa, venedik, akropolis, delfi, eyfel, zafer takı, notre dame, louvre, big ben, stonehenge, sagrada, neuschwanstein, brandenburg, elhamra, piramit, sfenks, petra, tac mahal, çin seddi, angkor, semerkant, özgürlük, golden gate, machu picchu, moai
+
+Eski temalar: orman, gün batımı, yağmur, şehir, gece, deniz
+
+Seçim yazmazsan fotoğrafı sistem seçer.`;
 
 async function telegram(env, method, body) {
   return fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {

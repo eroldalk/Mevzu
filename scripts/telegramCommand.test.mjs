@@ -80,6 +80,12 @@ test("/temalar GitHub'ı çalıştırmaz", async () => {
   assert.ok(calls[0].body.text.includes("orman"));
 });
 
+test("ülke adı birden çok yapıyı kapsar", () => {
+  const pool = [{ id: 1, place: "ayasofya" }, { id: 2, place: "diger:istanbul historic" }, { id: 3, place: "eyfel" }];
+  assert.deepEqual(findPlacePhotos(pool, "Türkiye").map((p) => p.id), [1, 2]);
+  assert.deepEqual(findPlacePhotos(pool, "avrupa").map((p) => p.id), [3]);
+});
+
 test("sözün ilk harfi büyütülür", () => {
   assert.equal(parseRequest("damlaya damlaya göl olur").quote, "Damlaya damlaya göl olur");
   assert.equal(parseRequest("ince söz").quote, "İnce söz");
