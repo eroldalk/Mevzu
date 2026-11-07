@@ -1,3 +1,4 @@
+import { buildHashtags } from "./hashtags.js";
 // src/utils/captionGenerator.js
 // Instagram Reels Açıklama (Caption) & Hashtag Motoru
 // Sözü ekrana yazmaz! 4 Parçalı Formül:
@@ -58,29 +59,6 @@ const CATEGORY_QUESTIONS = {
     "Finansal özgürlüğün önündeki en büyük engel sizce bilgisizlik mi, yoksa sabırsızlık mı?",
     "Bugün kazandığınız para hayatınızı mı inşa ediyor, yoksa sadece faturalarınızı mı ödüyor?",
   ],
-};
-
-// Kategoriye ve yazara özel hashtag haritası
-const AUTHOR_HASHTAGS = {
-  "niccolò machiavelli": ["#machiavelli", "#güç", "#strateji", "#liderlik"],
-  "machiavelli": ["#machiavelli", "#güç", "#strateji", "#liderlik"],
-  "marcus aurelius": ["#marcusaurelius", "#stoacılık", "#içhuzur"],
-  "seneca": ["#seneca", "#stoacılık", "#zaman"],
-  "epiktetos": ["#epiktetos", "#stoa", "#özgürlük", "#zihingücü"],
-  "nietzsche": ["#nietzsche", "#felsefe", "#güçistenci"],
-  "schopenhauer": ["#schopenhauer", "#pesimizm", "#derindüşünce"],
-  "sun tzu": ["#suntzu", "#strateji", "#zafer"],
-};
-
-const CATEGORY_HASHTAGS = {
-  GÜÇ: ["#liderlik", "#güç", "#strateji", "#psikoloji", "#etki"],
-  STRATEJİ: ["#strateji", "#vizyon", "#başarı", "#karar", "#hedef"],
-  STOACILIK: ["#stoacılık", "#stoic", "#içhuzur", "#disiplin", "#bilgelik"],
-  FELSEFE: ["#felsefe", "#düşünce", "#farkındalık", "#anlam", "#sorgulama"],
-  ZİHİN: ["#psikoloji", "#zihinyapısı", "#kişiselgelişim", "#farkındalık"],
-  DİRENÇ: ["#motivasyon", "#direnç", "#güçlüol", "#vazgeçme", "#azim"],
-  ZAMAN: ["#zaman", "#zamanidare", "#yaşam", "#farkındalık"],
-  FİNANS: ["#finans", "#vizyon", "#yatırım", "#başarı", "#finansalözgürlük"],
 };
 
 export async function generateInstagramCaption({
@@ -168,13 +146,7 @@ Sadece doğrudan Instagram'a yapıştırılacak nihai metni döndür.`;
   const soruHavuzu = tazeSorular.length ? tazeSorular : anaHavuz;
   const secilenSoru = soruHavuzu[Math.floor(Math.random() * soruHavuzu.length)];
 
-  // Hashtag kümesini oluştur
-  const yazarTags = AUTHOR_HASHTAGS[authorKey] || [`#${authorKey.replace(/[^a-z0-9]/g, "")}`];
-  const catTags = CATEGORY_HASHTAGS[matchedCatKey] || ["#felsefe", "#düşünce", "#farkındalık"];
-  const allTags = Array.from(new Set([...yazarTags, ...catTags, "#felsefe", "#mevzu"]))
-    .filter(Boolean)
-    .slice(0, 8)
-    .join(" ");
+  const allTags = buildHashtags({ quote, author: cleanAuthor, recentCaptions });
 
   return `${baslikSatiri ? `${baslikSatiri}\n\n` : ""}${secilenSoru}\n\nDüşünceni yorumlarda belirt 👇\n${cta.text}\n.\n.\n${allTags}`;
 }

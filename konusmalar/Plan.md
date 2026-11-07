@@ -39,6 +39,7 @@ Güncelleme: 31 Ekim 2026. Projenin güncel bilgisi burada tutulur. Ayrıntılı
 8. Sonra: Facebook, X, TikTok, YouTube Shorts; Agent teams.
 
 ## Açık kararlar
+- İleride havuz 400-500 fotoğrafa çıkarılacak ve fotoğraflar Firebase Storage üzerinden alınacak. Firestore belge sınırı nedeniyle fotoğraf için uygun değil. Storage için Blaze planı gerekip gerekmediği kontrol edilecek.
 - Fotoğraf sabit mi kalacak, hafif yakınlaşma mı olacak?
 - Fotoğraflar herkese açık dalda tutulacak mı? Pixabay toplu yeniden dağıtımı yasaklıyor, küçük bir lisans riski var.
 - Geniş yapılar için yatay fotoğraf ve bulanık arka plan yöntemi kullanılacak mı?
