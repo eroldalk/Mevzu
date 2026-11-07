@@ -13,7 +13,8 @@
 
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, collection, addDoc } from "firebase/firestore";
+import "dotenv/config";
+import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { readFile } from "node:fs/promises";
@@ -35,7 +36,8 @@ async function ask(question) {
   return answer;
 }
 
-const csvPath = new URL("./quotes-batch1.csv", import.meta.url);
+// Dosya adı verilebilir: node scripts/seedQuotesFromCsv.mjs quotes-batch2.csv
+const csvPath = new URL(`./${process.argv[2] || "quotes-batch1.csv"}`, import.meta.url);
 const csvContent = await readFile(csvPath, "utf-8");
 const rows = parse(csvContent, { columns: true, skip_empty_lines: true, trim: true });
 const quotes = rows.map((r) => ({ quote: r.quote, author: r.author, cat: r.cat }));
@@ -48,12 +50,17 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 await signInWithEmailAndPassword(auth, email, password);
-console.log(`Giriş yapıldı. ${quotes.length} söz ekleniyor...`);
 
-for (const q of quotes) {
+// Havuzda zaten olan sözler tekrar eklenmez
+const normalize = (text) => text.toLocaleLowerCase("tr-TR").replace(/[^\p{L}\p{N}]/gu, "");
+const existing = new Set((await getDocs(collection(db, "quotes"))).docs.map((d) => normalize(d.data().quote || "")));
+const fresh = quotes.filter((q) => !existing.has(normalize(q.quote)));
+console.log(`Giriş yapıldı. ${fresh.length} söz ekleniyor, ${quotes.length - fresh.length} tanesi zaten var.`);
+
+for (const q of fresh) {
   await addDoc(collection(db, "quotes"), q);
   console.log("  +", q.quote.split("\n")[0]);
 }
 
-console.log(`Tamam — ${quotes.length} söz Firestore'daki "quotes" koleksiyonuna eklendi.`);
+console.log(`Tamam — ${fresh.length} söz Firestore'daki "quotes" koleksiyonuna eklendi.`);
 process.exit(0);
