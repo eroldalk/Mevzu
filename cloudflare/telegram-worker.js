@@ -3,6 +3,8 @@
 // Gerekli değişkenler: TELEGRAM_BOT_TOKEN, WEBHOOK_SECRET, ALLOWED_USER_ID, GITHUB_TOKEN
 
 const WORKFLOW_URL = "https://api.github.com/repos/eroldalk/Mevzu/actions/workflows/telegram-command.yml/dispatches";
+// GitHub'ın kendi zamanlayıcısı gecikiyor; yayın akışı Cron Trigger ile buradan tetiklenir
+const DAILY_URL = "https://api.github.com/repos/eroldalk/Mevzu/actions/workflows/daily-reels.yml/dispatches";
 
 const HELP = `Komutlar:
 /post — Havuzdan söz, otomatik tema
@@ -30,8 +32,8 @@ async function telegram(env, method, body) {
   });
 }
 
-async function dispatch(env, inputs) {
-  const res = await fetch(WORKFLOW_URL, {
+async function dispatch(env, inputs, url = WORKFLOW_URL) {
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.GITHUB_TOKEN}`,
@@ -39,7 +41,7 @@ async function dispatch(env, inputs) {
       "Content-Type": "application/json",
       "User-Agent": "mevzu-telegram-worker",
     },
-    body: JSON.stringify({ ref: "main", inputs }),
+    body: JSON.stringify(inputs ? { ref: "main", inputs } : { ref: "main" }),
   });
   return res.ok;
 }
@@ -90,5 +92,9 @@ export default {
       else if (update.message) await handleMessage(env, update.message);
     }
     return new Response("ok");
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(dispatch(env, null, DAILY_URL));
   },
 };

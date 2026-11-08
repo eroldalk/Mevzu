@@ -107,3 +107,11 @@ test("Elle paylaştım düğmesi Worker'dan geçer", async () => {
 test("taslak düğmelerinde Elle paylaştım var", () => {
   assert.ok(draftButtons("tg_1").inline_keyboard.flat().some((b) => b.callback_data === "manual:tg_1"));
 });
+
+test("zamanlayıcı yayın akışını tetikler", async () => {
+  const waits = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) });
+  await Promise.all(waits);
+  assert.match(calls[0].url, /daily-reels\.yml\/dispatches$/);
+  assert.deepEqual(calls[0].body, { ref: "main" });
+});
