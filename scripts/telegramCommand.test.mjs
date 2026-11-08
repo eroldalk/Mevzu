@@ -98,3 +98,12 @@ test("yapı adı havuzda bulunur", () => {
   assert.deepEqual(findPlacePhotos(pool, "ancient"), []);
   assert.deepEqual(findPlacePhotos(pool, "uzay"), []);
 });
+
+test("Elle paylaştım düğmesi Worker'dan geçer", async () => {
+  await send({ callback_query: { id: "1", data: "manual:tg_1", from: { id: 42 }, message: { message_id: 9, chat: { id: 42 } } } });
+  assert.deepEqual(dispatches()[0].body.inputs, { action: "manual", draft_id: "tg_1" });
+});
+
+test("taslak düğmelerinde Elle paylaştım var", () => {
+  assert.ok(draftButtons("tg_1").inline_keyboard.flat().some((b) => b.callback_data === "manual:tg_1"));
+});

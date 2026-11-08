@@ -2,6 +2,7 @@
 
 export const STATUS_LABELS = {
   published: "Yayınlandı",
+  sent: "Telegram'a gönderildi",
   processing: "Hazırlanıyor",
   failed: "Hata, yeniden denenecek",
   skipped: "Atlandı",
@@ -9,7 +10,7 @@ export const STATUS_LABELS = {
   late: "Sıradaki uyanışta çıkacak",
 };
 
-const FORMAT_LABELS = { reels: "Reels", post: "Post", story: "Hikâye" };
+const FORMAT_LABELS = { reels: "Reels", post: "Post", story: "Hikâye", "telegram-post": "Telegram'a post", "telegram-reels": "Telegram'a reels" };
 
 export const getTurkeyDate = (now = Date.now()) => new Date(now + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
 

@@ -21,6 +21,8 @@ import { choosePhoto, loadPool, photoUrl } from "./photoPool.mjs";
 import { formatFailure, formatSkipped, formatSuccess, sendTelegramMedia, sendTelegramMessage } from "./telegramNotify.mjs";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 // Söz ilk kareden görünür; kapak için yarım saniyelik sakin kare yeterli
@@ -596,6 +598,17 @@ async function main() {
     // Doğal Algoritma Jitter'ı (5-20 saniye mikro bekleme)
     if (activeSlotInfo && !manualReqDoc) {
       await applyHumanJitter();
+    }
+
+    // Telegram'a gönder: Instagram'a atılmaz, hazırlanan taslak Telegram'a bildirim olarak gelir
+    if (format.startsWith("telegram-")) {
+      await promisify(execFile)(process.execPath, [path.join(__dirname, "telegramCommand.mjs")], {
+        env: { ...process.env, INPUT_ACTION: "preview", INPUT_FORMAT: format.replace("telegram-", ""), INPUT_TEXT: "", INPUT_SLOT: currentSlotId },
+        maxBuffer: 20 * 1024 * 1024,
+      });
+      await setDoc(doc(db, "slot_locks", `${currentDateStr}_${currentSlotId.replace(":", "")}`), { status: "sent", sentAt: new Date().toISOString() }, { merge: true });
+      console.log(`✅ TAMAMLANDI → Telegram'a gönderildi: [${currentSlotId}]`);
+      return;
     }
 
     if (format === "story") {

@@ -93,7 +93,7 @@ async function loadDraft(draftId) {
   return snap.data();
 }
 
-async function preview({ format, text, draftId }) {
+async function preview({ format, text, draftId, slotId = null }) {
   const source = draftId ? await loadDraft(draftId) : null;
   const request = source ? { quote: null, theme: null, unknownTheme: null } : parseRequest(text);
   const pool = await loadPool();
@@ -132,7 +132,8 @@ async function preview({ format, text, draftId }) {
   });
   if (draftId) await updateDoc(doc(db, "telegram_posts", draftId), { telegramStatus: "replaced" });
 
-  await sendTelegramMedia(output, `Önizleme\n\n${caption}`, mediaType(finalFormat), draftButtons(id));
+  if (slotId) await sendTelegramMessage(`🔔 Paylaşım zamanı · ${slotId}`);
+  await sendTelegramMedia(output, caption, mediaType(finalFormat), draftButtons(id));
 }
 
 // Çift basışta ikinci yayın başlamasın diye taslak atomik olarak kilitlenir
@@ -217,6 +218,19 @@ async function cancel(draftId) {
   await sendTelegramMessage("❌ Taslak iptal edildi, söz harcanmadı.");
 }
 
+// Kullanıcı Buffer veya uygulamadan elle paylaştı: söz harcanır, Instagram'a gönderilmez
+async function markManual(draftId) {
+  const draft = await claimDraft(draftId);
+  if (!draft) {
+    await sendTelegramMessage("ℹ️ Bu taslak zaten işlendi.");
+    return;
+  }
+  const now = new Date().toISOString();
+  if (draft.quoteId) await updateDoc(doc(db, "quotes", draft.quoteId), { used: true, usedAt: now, usedInVideoId: draft.id });
+  await updateDoc(doc(db, "telegram_posts", draft.id), { telegramStatus: "manual", manualAt: now });
+  await sendTelegramMessage("📲 Kaydedildi, bu söz bir daha seçilmeyecek.");
+}
+
 async function status() {
   const today = getTurkeyDate();
   const settings = (await getDoc(doc(db, "settings", "schedule"))).data() || {};
@@ -232,11 +246,12 @@ async function status() {
 }
 
 async function main() {
-  const { INPUT_ACTION: action, INPUT_FORMAT: format, INPUT_TEXT: text, INPUT_DRAFT_ID: draftId } = process.env;
-  if (action === "preview") return preview({ format: format === "post" ? "post" : "reels", text: text || "" });
+  const { INPUT_ACTION: action, INPUT_FORMAT: format, INPUT_TEXT: text, INPUT_DRAFT_ID: draftId, INPUT_SLOT: slotId } = process.env;
+  if (action === "preview") return preview({ format: format === "post" ? "post" : "reels", text: text || "", slotId: slotId || null });
   if (action === "refresh") return preview({ draftId });
   if (action === "publish") return publish(draftId);
   if (action === "cancel") return cancel(draftId);
+  if (action === "manual") return markManual(draftId);
   if (action === "status") return status();
   throw new Error(`Bilinmeyen işlem: ${action}`);
 }

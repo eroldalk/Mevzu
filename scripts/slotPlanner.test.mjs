@@ -77,3 +77,7 @@ test("her çalışma en fazla 1 yayın yapar: 4 uyanışta en fazla 4 yayın ç�
 test("gün içine dağılan 5 uyanışta 5 yayın çıkar", () => {
   assert.equal(simulateDay(["09:10", "12:40", "15:20", "18:30", "21:15"]).published.length, 5);
 });
+
+test("Telegram'a gönderilen slot tekrar seçilmez", () => {
+  assert.equal(planSlot({ slots: FIVE, currentMinutes: at("09:30"), slotStates: { "09:00": "sent" } }).slot, null);
+});

@@ -54,7 +54,7 @@ export function parseRequest(text = "") {
 
 export const draftButtons = (id) => ({
   inline_keyboard: [
-    [{ text: "✅ Yayınla", callback_data: `publish:${id}` }],
+    [{ text: "✅ Yayınla", callback_data: `publish:${id}` }, { text: "📲 Elle paylaştım", callback_data: `manual:${id}` }],
     [{ text: "🔄 Yenile", callback_data: `refresh:${id}` }, { text: "❌ İptal", callback_data: `cancel:${id}` }],
   ],
 });

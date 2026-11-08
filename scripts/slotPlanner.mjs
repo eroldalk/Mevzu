@@ -6,7 +6,7 @@ export const EARLY_TOLERANCE_MINUTES = 3;
 
 const toMinutes = (slot) => slot.hour * 60 + slot.minute;
 
-// slotStates: { "09:00": "published" | "skipped" | "processing" | "failed" }
+// slotStates: { "09:00": "published" | "sent" | "skipped" | "processing" | "failed" }
 // Dönen değer: { slot, skipped, blockedBy }
 // - slot: şimdi yayınlanacak slot (yoksa null)
 // - skipped: bu çalışmada süresi dolduğu tespit edilen slotlar
@@ -22,7 +22,7 @@ export function planSlot({ slots, currentMinutes, slotStates = {}, maxDelay = MA
   const skipped = [];
   for (const s of due) {
     const state = slotStates[s.id];
-    if (state === "published" || state === "skipped") continue;
+    if (state === "published" || state === "skipped" || state === "sent") continue;
     if (currentMinutes - toMinutes(s) > maxDelay) {
       skipped.push(s);
       continue;

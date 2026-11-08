@@ -63,12 +63,12 @@ async function handleMessage(env, message) {
 
 async function handleCallback(env, query) {
   const [action, draftId] = String(query.data || "").split(":");
-  if (!["publish", "refresh", "cancel"].includes(action) || !draftId) {
+  if (!["publish", "refresh", "cancel", "manual"].includes(action) || !draftId) {
     return telegram(env, "answerCallbackQuery", { callback_query_id: query.id, text: "Geçersiz işlem" });
   }
 
   const started = await dispatch(env, { action, draft_id: draftId });
-  const labels = { publish: "Yayınlanıyor", refresh: "Yenileniyor", cancel: "İptal ediliyor" };
+  const labels = { publish: "Yayınlanıyor", refresh: "Yenileniyor", cancel: "İptal ediliyor", manual: "Kaydediliyor" };
   await telegram(env, "answerCallbackQuery", { callback_query_id: query.id, text: started ? labels[action] : "Başlatılamadı" });
   // İkinci basışı önlemek için düğmeler kaldırılır
   if (started && query.message) {

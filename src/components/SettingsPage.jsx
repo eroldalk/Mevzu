@@ -357,6 +357,8 @@ export default function SettingsPage({ tema, onBack }) {
                       >
                         <option value="reels">Reels</option>
                         <option value="post">Post</option>
+                        <option value="telegram-post">Telegram'a post</option>
+                        <option value="telegram-reels">Telegram'a reels</option>
                       </select>
 
                       {/* Özel saat girişi */}
